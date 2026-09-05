@@ -37,6 +37,7 @@ def test_forside_og_state(client):
     assert len(st["settings"]["rounds"]) == 3
     assert st["settings"]["rounds"][0]["date"] == "2026-09-18"
     assert st["settings"]["rounds"][0]["course"] == "Samsø Golfklub"
+    assert st["settings"]["name"] == "SlamChamp 2026"
     r0 = st["settings"]["rounds"][0]
     assert r0["tees"][0]["name"] == "56" and r0["tees"][0]["cr"] == 70.8 and r0["tees"][0]["slope"] == 131
     assert r0["tees"][1]["name"] == "49" and r0["tees"][1]["cr"] == 66.9 and r0["tees"][1]["slope"] == 122
@@ -133,6 +134,7 @@ def test_gammelt_format_migreres_og_deltagerliste_laegges_ind(golf):
     assert erik["carry"] == 46  # medbragte point slås op på navnet
     assert st["settings"]["rounds"][0]["tees"] == [{"name": "Gul", "cr": 71.0, "slope": 120}]
     assert st["seeded"] is True
+    assert st["settings"]["name"] == "Test"  # et egentligt navn rører migrationen ikke
 
 
 def test_pin_beskytter_farlige_handlinger(client):

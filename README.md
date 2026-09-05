@@ -133,6 +133,17 @@ docker compose restart golf
 Filnavnet er dato og time (her 18/9 kl. 14 UTC, dvs. kl. 16 dansk sommertid). Hent en kopi ned til
 dig selv med `docker compose cp golf:/data/backup/golf-20260918-14.json .`.
 
+## Vejledninger
+
+I mappen `docs/` ligger to vejledninger som HTML og PDF:
+
+* `spillervejledning.pdf` – én side til spillerne med adresse og QR-kode: vælg navn, bekræft
+  handicap, tast slag, følg stillingen og reglerne kort. Samme tekst findes i appen under fanen *Hjælp*.
+* `arrangoer.pdf` – arrangørens tjekliste med kommandoer til serveren og en oversigt over, hvad PIN'en
+  åbner.
+
+Ret HTML-filerne og byg PDF'erne igen med `python docs/lav_pdf.py` (kræver Playwright med Chromium).
+
 ## Tests
 
 ```bash

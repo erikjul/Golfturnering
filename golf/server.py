@@ -123,7 +123,7 @@ def standard_state() -> dict[str, Any]:
     return {
         "version": 1,
         "settings": {
-            "name": "Golfturnering 2026",
+            "name": "SlamChamp 2026",
             "allowance": 100,
             "rules": STANDARD_REGLER,
             "rounds": [
@@ -167,6 +167,8 @@ class Lager:
                 state["scores"].setdefault(str(i), {})
             s = state.setdefault("settings", grund["settings"])
             s.setdefault("name", grund["settings"]["name"])
+            if s["name"] == "Golfturnering 2026":  # det gamle standardnavn
+                s["name"] = "SlamChamp 2026"
             s.setdefault("allowance", 100)
             s.setdefault("rules", STANDARD_REGLER)
             runder = s.setdefault("rounds", [])

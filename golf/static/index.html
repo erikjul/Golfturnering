@@ -98,9 +98,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 main { max-width: 760px; margin: 0 auto; padding: 16px 14px 110px; display: grid; gap: 14px; }
 
 /* ---------- Faner ---------- */
-.views { display: grid; grid-template-columns: repeat(4, 1fr); background: var(--surface-2); border-radius: 999px; padding: 4px; gap: 4px; }
+.views { display: grid; grid-template-columns: repeat(5, 1fr); background: var(--surface-2); border-radius: 999px; padding: 4px; gap: 4px; }
 .views button {
-  border: 0; background: transparent; padding: 9px 4px; border-radius: 999px; font-weight: 600; color: var(--muted); font-size: 15px;
+  border: 0; background: transparent; padding: 9px 2px; border-radius: 999px; font-weight: 600; color: var(--muted); font-size: 14px;
   transition: background .15s, color .15s;
 }
 .views button[aria-selected="true"] { background: var(--board); color: var(--board-ink); box-shadow: var(--shadow-sm); }
@@ -331,12 +331,14 @@ details summary { cursor: pointer; font-weight: 600; padding: 6px 0; }
     <button role="tab" data-view="board" aria-selected="false">Stilling</button>
     <button role="tab" data-view="overall" aria-selected="false">Samlet</button>
     <button role="tab" data-view="course" aria-selected="false">Banen</button>
+    <button role="tab" data-view="help" aria-selected="false">Hjælp</button>
   </div>
 
   <section id="view-score"></section>
   <section id="view-board" class="hidden"></section>
   <section id="view-overall" class="hidden"></section>
   <section id="view-course" class="hidden"></section>
+  <section id="view-help" class="hidden"></section>
   <section id="view-settings" class="hidden"></section>
 </main>
 
@@ -452,7 +454,7 @@ Drikkevand foran hul 1 og 10. Toiletter ved hul 10 og 13. Hjertestarter ved klub
       return {
         version: 1,
         settings: {
-          name: "Golfturnering 2026", allowance: 100, rules: SAMSOE.rules,
+          name: "SlamChamp 2026", allowance: 100, rules: SAMSOE.rules,
           rounds: [["2026-09-18", "Fredag"], ["2026-09-19", "Lørdag"], ["2026-09-20", "Søndag"]].map(([date, label]) => ({
             date, label, course: "Samsø Golfklub", tees: [{ name: "56", cr: 70.8, slope: 131, lengths: SAMSOE.lengths["56"].slice() }, { name: "49", cr: 66.9, slope: 122, lengths: SAMSOE.lengths["49"].slice() }], par: PAR.slice(), si: SI.slice(), closed: false,
           })),
@@ -600,11 +602,12 @@ Drikkevand foran hul 1 og 10. Toiletter ved hul 10 og 13. Hjertestarter ved klub
     renderMe();
     document.querySelectorAll("#views button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.view === view)));
     $("#views").classList.toggle("hidden", view === "settings");
-    ["score", "board", "overall", "course", "settings"].forEach((v) => $("#view-" + v).classList.toggle("hidden", v !== view));
+    ["score", "board", "overall", "course", "help", "settings"].forEach((v) => $("#view-" + v).classList.toggle("hidden", v !== view));
     if (view === "score") renderScore();
     if (view === "board") renderBoard();
     if (view === "overall") renderOverall();
     if (view === "course") renderCourse();
+    if (view === "help") renderHelp();
     if (view === "settings") renderSettings();
     if (sheetHole) renderSheet();
   }
@@ -873,6 +876,39 @@ Drikkevand foran hul 1 og 10. Toiletter ved hul 10 og 13. Hjertestarter ved klub
         ${tees.length ? '<p class="muted" style="font-size:13px">Længder i meter fra klubbens baneguide.</p>' : ""}
       </div>
       ${rules ? `<div class="card rules">${rules}</div>` : ""}`;
+  }
+
+  // ---------- hjælp ----------
+  function renderHelp() {
+    const el = $("#view-help");
+    const name = esc(state.settings.name || "turneringen");
+    el.innerHTML = `
+      <div class="card rules">
+        <h2>Sådan bruger du appen</h2>
+        <p class="muted">Fem ting at kunne, så går resten af sig selv.</p>
+        <h3>1. Vælg dit navn</h3>
+        <p>Øverst står "Hvem er du?". Vælg dit navn i listen, hvor dit DGU-nummer også står. Står du ikke på listen, så tryk "Står du ikke på listen?" nederst og tilføj dig. Brug den kun, hvis dit navn virkelig mangler, ellers får vi dubletter.</p>
+        <h3>2. Bekræft dit handicap inden runden</h3>
+        <p>Vælg dagen øverst (fredag, lørdag eller søndag). Tjek, at tallet i "HCP-index" er dit aktuelle DGU-handicapindeks, ret det hvis det har ændret sig, vælg tee, og tryk <b>Bekræft</b>. Appen regner selv dit spillehandicap ud, præcis som klubbens konverteringstabel.</p>
+        <p>Først når du har bekræftet, er du med på dagen. Bekræfter du ikke, får du 0 point for runden og tæller ikke med i deltagerantallet.</p>
+        <p>Bekræftelsen låser dit navn til din telefon. Ingen andre kan taste for dig, og du kan ikke taste for andre. Skifter du telefon, så bed arrangøren frigive dit navn.</p>
+        <h3>3. Tast dine slag hul for hul</h3>
+        <p>Under "Scorekort" trykker du på hullet og vælger antal slag på tastaturet. Under hvert tal står de Stablefordpoint, det giver. "Streg" bruger du, hvis du opgiver hullet (0 point). Tastaturet springer selv videre til næste hul. Tastede du forkert, så tryk på hullet igen og vælg det rigtige tal.</p>
+        <p>Rubrikken "Ekstra slag" viser, hvor mange slag du får på det næste hul, og hver hullinje viser par, handicapnøgle, længde og dine ekstra slag.</p>
+        <h3>4. Følg stillingen</h3>
+        <p>"Stilling" er dagens rangliste, som opdateres hos alle med det samme. Pilene viser, hvem der rykker op og ned. Når alle deltagere har tastet 18 huller, vises dagens vinder og ranglistepointene.</p>
+        <p>"Samlet" er den løbende rangliste for ${name}: pointene fra før turneringen ("Før") plus det, der tjenes på Samsø. Flest point øverst.</p>
+        <h3>5. Reglerne kort</h3>
+        <p>Dagens rangering: flest Stablefordpoint øverst. Ved lige point står den med laveste HCP-index bedst.</p>
+        <p>Ranglistepoint: vinderen får antal deltagere + 2. Resten fordeles fra bunden: sidstepladsen får 1, næstsidst 2, og så videre, så nr. 2 får antal deltagere − 1. Med 18 deltagere: nr. 1 = 20, nr. 2 = 17, nr. 3 = 16 … nr. 18 = 1.</p>
+        <p>Når en runde er færdig, kan der rettes i et kvarter. Derefter er den låst, og rettelser går gennem arrangøren.</p>
+        <h3>Hvis noget driller</h3>
+        <p><b>Jeg kan ikke taste.</b> Har du bekræftet til dagen? Står dit navn som "på en anden telefon"? Så er det låst til en anden telefon; bed arrangøren frigive det.</p>
+        <p><b>Siden virker gammel.</b> Træk ned for at genindlæse, eller luk og åbn siden igen. Appen henter nyt hvert par sekunder, når den er åben.</p>
+        <p><b>Ingen dækning på et hul.</b> Tast, når du har dækning igen. Dine tal gemmes først, når telefonen har forbindelse, så vent på, at tallet står på scorekortet.</p>
+        <p><b>Læg siden på hjemmeskærmen.</b> iPhone: Del-knappen og "Føj til hjemmeskærm". Android: menuen og "Føj til startskærm". Så opfører den sig som en app.</p>
+        <p class="muted" style="margin-top:14px">Lokalregler og baneoversigt finder du under "Banen".</p>
+      </div>`;
   }
 
   // ---------- opsætning ----------

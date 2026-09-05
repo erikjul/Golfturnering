@@ -1,0 +1,63 @@
+<!doctype html><html lang="da"><head><meta charset="utf-8"><title>SlamChamp 2026 – arrangørens tjekliste</title><link rel="stylesheet" href="_style.css"><style>body{font-size:9.8pt;line-height:1.35}.top h1{font-size:20pt}pre{padding:5px 9px;margin:3px 0 5px}h2{margin-bottom:3px}.cols{gap:10px 18px}</style></head><body>
+<div class="top">
+  <div><h1>Arrangørens tjekliste</h1><div class="sub">SlamChamp 2026 · kun til Erik</div></div>
+  <div class="addr"><b>slamchamp.boardbusiness.dk</b><span>Server: 2.29.21.32 (Hetzner) · repo: github.com/erikjul/golfturnering</span></div>
+</div>
+<div class="cols">
+<section>
+  <h2>Inden turneringen</h2>
+  <ul class="check">
+    <li><b>Opdater appen</b> til nyeste version (kommandoerne til højre) og tjek, at <code>GOLF_PIN</code> i <code>.env</code> har et tal.</li>
+    <li><b>Send spillervejledningen</b> og adressen i gruppen. Bed alle lægge siden på hjemmeskærmen og vælge deres navn hjemmefra.</li>
+    <li><b>Nulstil turneringen</b> aftenen før 18/9: tandhjul, PIN, <i>Nulstil</i>, skriv NULSTIL. Så er alle prøvedata væk, og de 20 navne står klar med deres medbragte point.</li>
+    <li><b>Tjek Opsætning:</b> turneringsnavn SlamChamp 2026, tee 56 og 49 med de rigtige tal, og at <i>Kopiér bane til alle runder</i> er brugt.</li>
+    <li><b>Bekræft dit eget navn</b> fra den telefon, du vil taste fra.</li>
+  </ul>
+  <h2>På spilledagen</h2>
+  <ul class="check">
+    <li>Mind alle om at <b>bekræfte handicap</b> før første tee. Ranglisten under <i>Stilling</i> viser nederst, hvor mange på listen der ikke har bekræftet.</li>
+    <li>Følg <i>Stilling</i>. Når alle deltagere har 18 huller, vises vinderen og pointene af sig selv.</li>
+    <li><b>En spiller kan ikke taste:</b> tandhjul, PIN, <i>Deltagerliste</i>, tryk <b>Frigiv</b> ved navnet. Spilleren bekræfter igen fra sin telefon.</li>
+    <li><b>Forkert handicap efter første score:</b> tandhjul, PIN, <i>Deltagerliste</i>, <b>Ret HCP</b> ved navnet. Gælder den valgte dag.</li>
+    <li><b>En spiller tastede forkert, og runden er låst</b> (mere end et kvarter efter afslutning): skriv PIN under tandhjulet, vælg spillerens navn med <i>Skift</i>, ret hullet, og vælg dit eget navn igen. Med PIN indtastet kan din telefon taste for alle.</li>
+    <li><b>Nogen bliver aldrig færdig:</b> tandhjul, PIN, <b>Luk runden nu</b> ved dagen. Vinderen findes blandt dem, der har tastet; en spiller uden scorer udgår. <i>Genåbn runden</i> fortryder.</li>
+    <li><b>En 21. spiller:</b> vedkommende bruger <i>Står du ikke på listen?</i> og får 0 medbragte point. Ret med <b>Før</b> i deltagerlisten, hvis der skal være point med.</li>
+  </ul>
+  <h2>Efter turneringen</h2>
+  <ul class="check">
+    <li>Tag et skærmbillede af <i>Samlet</i>, og hent data ned (kommando til højre).</li>
+    <li>Serveren koster ca. 7,5 € om måneden. Behold den til næste app, eller slet den i Hetzners kontrolpanel.</li>
+  </ul>
+</section>
+<section>
+  <h2>Kommandoer</h2>
+  <p>Fra PowerShell på din pc:</p>
+  <pre>ssh root@2.29.21.32</pre>
+  <p><b>Opdatere appen</b> (efter rettelser fra Claude):</p>
+  <pre>cd /opt/golfturnering
+git pull
+docker compose up -d --build</pre>
+  <p><b>Tjekke at den kører:</b></p>
+  <pre>docker compose logs --tail 5 golf</pre>
+  <p><b>Tjekke eller sætte PIN</b> (genstart bagefter):</p>
+  <pre>cat .env
+printf 'GOLF_PIN=4711\n' > .env
+docker compose up -d</pre>
+  <p><b>Sikkerhedskopier.</b> Appen gemmer selv en kopi pr. time i to døgn. Se dem og læg én tilbage:</p>
+  <pre>docker compose exec golf ls -l /data/backup
+docker compose exec golf cp /data/backup/golf-20260918-14.json /data/golf.json
+docker compose restart golf</pre>
+  <p>Filnavnet er dato og time i UTC (kl. 14 = kl. 16 dansk tid).</p>
+  <p><b>Hente data ned til pc'en</b> (kør på pc'en, ikke serveren):</p>
+  <pre>scp root@2.29.21.32:/opt/golfturnering/golf.json .</pre>
+  <p>efter først at have kørt <code>docker compose cp golf:/data/golf.json .</code> på serveren.</p>
+  <h2>Hvad PIN'en åbner</h2>
+  <table>
+    <tr><th>Kræver PIN</th><th>Kræver aldrig PIN</th></tr>
+    <tr><td>Gemme baneopsætning, lukke/genåbne runder, slette spillere, rette handicap efter første score, medbragte point, frigive navne, taste for andre, rette i låst runde, nulstille</td><td>Vælge navn, bekræfte handicap, taste og rette egne scorer (indtil et kvarter efter runden er færdig), tilføje ny spiller</td></tr>
+  </table>
+  <div class="box gold">PIN'en skrives én gang i feltet øverst under tandhjulet og huskes i den browser. Skriv den ikke på en telefon, andre låner.</div>
+</section>
+</div>
+<div class="foot"><span>SlamChamp 2026 · arrangørens tjekliste</span><span>Rettelser i appen laves i repoet golfturnering</span></div>
+</body></html>
