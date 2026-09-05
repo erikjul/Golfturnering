@@ -26,7 +26,10 @@ from pydantic import BaseModel, Field
 HER = Path(__file__).resolve().parent
 DATA_DIR = Path(os.environ.get("GOLF_DATA_DIR", HER / "data"))
 DATA_FIL = DATA_DIR / "golf.json"
+BACKUP_DIR = DATA_DIR / "backup"
+BACKUP_ANTAL = 48  # én kopi pr. time, de seneste to døgn
 PIN = os.environ.get("GOLF_PIN", "").strip()
+FRYS_EFTER_SEK = 15 * 60  # rettelser uden PIN tillades et kvarter efter, at runden er færdig
 
 ANTAL_RUNDER = 3
 
@@ -106,6 +109,7 @@ def ny_spiller(navn: str, hcp: float, dgu: str = "", tee: str = "", carry: int =
         "hcp": hcp,  # senest kendte HCP-index (startværdi for næste bekræftelse)
         "hcpByRound": {},  # runde -> bekræftet HCP-index; kun bekræftede spillere deltager på runden
         "carry": carry,  # ranglistepoint medbragt fra tidligere runder
+        "device": "",  # den telefon (tilfældigt id), der ejer navnet; tom = ikke låst
         "tee": tee,
         "created": time.time(),
     }
@@ -131,6 +135,7 @@ def standard_state() -> dict[str, Any]:
                     "par": list(STANDARD_PAR),
                     "si": list(STANDARD_SI),
                     "closed": False,
+                    "completedAt": None,  # tidspunkt hvor alle deltagere havde 18 huller
                 }
                 for d, lab in RUNDER
             ],
@@ -178,7 +183,10 @@ class Lager:
                 p.setdefault("dgu", "")
                 p.setdefault("hcpByRound", {})
                 p.setdefault("carry", medbragt.get(p["name"].casefold(), 0))
+                p.setdefault("device", "")
                 p.pop("absent", None)
+            for r in runder:
+                r.setdefault("completedAt", None)
             if not state.get("seeded"):  # deltagerlisten lægges ind én gang; kendte navne genbruges
                 kendte = {p["name"].casefold() for p in state["players"]}
                 state["players"] += [p for p in standard_spillere() if p["name"].casefold() not in kendte]
@@ -193,6 +201,21 @@ class Lager:
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(self.state, f, ensure_ascii=False, indent=1)
         os.replace(tmp, self.fil)
+        self._sikkerhedskopi()
+
+    def _sikkerhedskopi(self) -> None:
+        """Én kopi pr. time i backup-mappen (overskrives inden for timen); de seneste 48 beholdes."""
+        try:
+            BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+            navn = BACKUP_DIR / time.strftime("golf-%Y%m%d-%H.json")
+            tmp = navn.with_suffix(".tmp")
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(self.state, f, ensure_ascii=False, indent=1)
+            os.replace(tmp, navn)
+            for gammel in sorted(BACKUP_DIR.glob("golf-*.json"))[:-BACKUP_ANTAL]:
+                gammel.unlink()
+        except OSError:
+            pass  # en fejlende kopi må aldrig stoppe selve gemningen
 
 
 lager = Lager(DATA_FIL)
@@ -218,6 +241,57 @@ def find_spiller(pid: str) -> dict[str, Any]:
 def tjek_runde(r: int) -> None:
     if not 0 <= r < ANTAL_RUNDER:
         raise HTTPException(404, "Runden findes ikke")
+
+
+def offentlig(p: dict[str, Any]) -> dict[str, Any]:
+    """Spilleren uden telefonens id (det bliver aldrig sendt ud)."""
+    return {k: v for k, v in p.items() if k != "device"}
+
+
+def har_pin(pin: str | None) -> bool:
+    return bool(PIN) and bool(pin) and secrets.compare_digest(pin, PIN)
+
+
+def kraev_ejer(p: dict[str, Any], device: str | None, pin: str | None) -> None:
+    """Navnet må kun bruges fra den telefon, der ejer det. PIN (arrangøren) går altid igennem."""
+    if har_pin(pin):
+        return
+    if p.get("device") and p["device"] != (device or ""):
+        raise HTTPException(403, f"{p['name']} bruges fra en anden telefon. Bed arrangøren frigive navnet.")
+
+
+def bind_device(p: dict[str, Any], device: str | None) -> None:
+    if device and not p.get("device"):
+        p["device"] = device[:64]
+
+
+def runde_faerdig(r: int) -> bool:
+    """Alle, der har bekræftet til runden, har 18 huller (og mindst én deltager)."""
+    scores = lager.state["scores"][str(r)]
+    deltagere = [p for p in lager.state["players"] if str(r) in p["hcpByRound"]]
+    return bool(deltagere) and all(
+        len(scores.get(p["id"], [])) == 18 and all(x is not None for x in scores[p["id"]]) for p in deltagere
+    )
+
+
+def runde_frosset(r: int) -> bool:
+    """Færdig i mere end et kvarter: rettelser kræver PIN."""
+    rd = lager.state["settings"]["rounds"][r]
+    return bool(rd.get("completedAt")) and time.time() - rd["completedAt"] > FRYS_EFTER_SEK and runde_faerdig(r)
+
+
+def opdater_faerdig(r: int) -> None:
+    rd = lager.state["settings"]["rounds"][r]
+    if runde_faerdig(r):
+        if not rd.get("completedAt"):
+            rd["completedAt"] = time.time()
+    else:
+        rd["completedAt"] = None
+
+
+def kraev_ikke_frosset(r: int, pin: str | None) -> None:
+    if runde_frosset(r) and not har_pin(pin):
+        raise HTTPException(409, "Runden er færdig og låst. Rettelser kræver arrangørens PIN.")
 
 
 def rens_navn(navn: str) -> str:
@@ -279,6 +353,7 @@ class Runde(BaseModel):
     par: list[int]
     si: list[int]
     closed: bool = False
+    completedAt: float | None = None  # sættes kun af serveren; værdien fra klienten ignoreres
 
 
 class Opsaetning(BaseModel):
@@ -305,33 +380,41 @@ def sundhed() -> dict[str, str]:
 
 
 @app.get("/api/state")
-def hent_state(since: int = 0) -> JSONResponse:
+def hent_state(since: int = 0, x_golf_device: str | None = Header(default=None)) -> JSONResponse:
     with lager.lock:
         if since and since == lager.state["version"]:
             return JSONResponse({"unchanged": True, "version": since, "pinRequired": bool(PIN)})
-        body = dict(lager.state)
+        body = json.loads(json.dumps(lager.state))
+    # Telefonens id sendes aldrig ud; klienten får kun at vide, om navnet er låst, og om det er dens eget
+    for p in body["players"]:
+        dev = p.pop("device", "")
+        p["locked"] = bool(dev)
+        p["mine"] = bool(dev) and dev == (x_golf_device or "")
     body["pinRequired"] = bool(PIN)
     body["serverTime"] = time.time()
+    body["freezeAfter"] = FRYS_EFTER_SEK
     return JSONResponse(body, headers={"Cache-Control": "no-store"})
 
 
 @app.post("/api/players", status_code=201)
-def opret_spiller(data: NySpiller) -> dict[str, Any]:
+def opret_spiller(data: NySpiller, x_golf_device: str | None = Header(default=None)) -> dict[str, Any]:
     navn = rens_navn(data.name)
     hcp = tjek_hcp(data.hcp)
     with lager.lock:
         if any(p["name"].casefold() == navn.casefold() for p in lager.state["players"]):
             raise HTTPException(409, "Der er allerede en spiller med det navn")
         spiller = ny_spiller(navn, hcp, data.dgu.strip()[:20], data.tee.strip()[:30], carry=0)
+        bind_device(spiller, x_golf_device)
         lager.state["players"].append(spiller)
         lager.gem()
-        return {"player": spiller, "version": lager.state["version"]}
+        return {"player": offentlig(spiller), "version": lager.state["version"]}
 
 
 @app.put("/api/players/{pid}")
-def ret_spiller(pid: str, data: RetSpiller) -> dict[str, Any]:
+def ret_spiller(pid: str, data: RetSpiller, x_golf_device: str | None = Header(default=None), x_golf_pin: str | None = Header(default=None)) -> dict[str, Any]:
     with lager.lock:
         p = find_spiller(pid)
+        kraev_ejer(p, x_golf_device, x_golf_pin)
         if data.name is not None:
             navn = rens_navn(data.name)
             if any(q["id"] != pid and q["name"].casefold() == navn.casefold() for q in lager.state["players"]):
@@ -344,19 +427,22 @@ def ret_spiller(pid: str, data: RetSpiller) -> dict[str, Any]:
         if data.dgu is not None:
             p["dgu"] = data.dgu.strip()[:20]
         lager.gem()
-        return {"player": p, "version": lager.state["version"]}
+        return {"player": offentlig(p), "version": lager.state["version"]}
 
 
 @app.put("/api/players/{pid}/confirm/{r}")
-def bekraeft(pid: str, r: int, data: Bekraeftelse, x_golf_pin: str | None = Header(default=None)) -> dict[str, Any]:
+def bekraeft(pid: str, r: int, data: Bekraeftelse, x_golf_pin: str | None = Header(default=None), x_golf_device: str | None = Header(default=None)) -> dict[str, Any]:
     """Spilleren bekræfter sit aktuelle HCP-index (og tee) til runden og deltager dermed på den.
-    Er der allerede tastet scorer på runden, kræver en ændring af indekset PIN."""
+    Første bekræftelse låser navnet til telefonen. Er der allerede tastet scorer på runden, kræver
+    en ændring af indekset PIN."""
     tjek_runde(r)
     hcp = tjek_hcp(data.hcp)
     with lager.lock:
         p = find_spiller(pid)
+        kraev_ejer(p, x_golf_device, x_golf_pin)
         if lager.state["settings"]["rounds"][r]["closed"]:
             raise HTTPException(409, "Runden er lukket")
+        kraev_ikke_frosset(r, x_golf_pin)
         gammel = p["hcpByRound"].get(str(r))
         har_scorer = pid in lager.state["scores"][str(r)]
         if har_scorer and gammel is not None and gammel != hcp:
@@ -367,8 +453,22 @@ def bekraeft(pid: str, r: int, data: Bekraeftelse, x_golf_pin: str | None = Head
         p["hcp"] = hcp
         if data.tee is not None:
             p["tee"] = data.tee.strip()[:30]
+        if not har_pin(x_golf_pin):
+            bind_device(p, x_golf_device)
+        opdater_faerdig(r)
         lager.gem()
-        return {"player": p, "version": lager.state["version"]}
+        return {"player": offentlig(p), "version": lager.state["version"]}
+
+
+@app.delete("/api/players/{pid}/device")
+def frigiv_navn(pid: str, x_golf_pin: str | None = Header(default=None)) -> dict[str, Any]:
+    """Frigiver navnet, så det kan bruges fra en anden telefon. Kræver PIN."""
+    kraev_pin(x_golf_pin)
+    with lager.lock:
+        p = find_spiller(pid)
+        p["device"] = ""
+        lager.gem()
+        return {"ok": True, "version": lager.state["version"]}
 
 
 @app.put("/api/players/{pid}/carry")
@@ -379,23 +479,26 @@ def ret_medbragt(pid: str, data: Medbragt, x_golf_pin: str | None = Header(defau
         p = find_spiller(pid)
         p["carry"] = data.carry
         lager.gem()
-        return {"player": p, "version": lager.state["version"]}
+        return {"player": offentlig(p), "version": lager.state["version"]}
 
 
 @app.delete("/api/players/{pid}/confirm/{r}")
-def fortryd_bekraeftelse(pid: str, r: int, x_golf_pin: str | None = Header(default=None)) -> dict[str, Any]:
+def fortryd_bekraeftelse(pid: str, r: int, x_golf_pin: str | None = Header(default=None), x_golf_device: str | None = Header(default=None)) -> dict[str, Any]:
     """Trækker deltagelsen på runden tilbage. Med scorer på runden kræves PIN, og scorerne slettes."""
     tjek_runde(r)
     with lager.lock:
         p = find_spiller(pid)
+        kraev_ejer(p, x_golf_device, x_golf_pin)
+        kraev_ikke_frosset(r, x_golf_pin)
         if pid in lager.state["scores"][str(r)]:
             kraev_pin(x_golf_pin)
             if not PIN:
                 raise HTTPException(409, "Der er tastet scorer på runden")
             del lager.state["scores"][str(r)][pid]
         p["hcpByRound"].pop(str(r), None)
+        opdater_faerdig(r)
         lager.gem()
-        return {"player": p, "version": lager.state["version"]}
+        return {"player": offentlig(p), "version": lager.state["version"]}
 
 
 @app.delete("/api/players/{pid}")
@@ -406,25 +509,30 @@ def slet_spiller(pid: str, x_golf_pin: str | None = Header(default=None)) -> dic
         lager.state["players"] = [p for p in lager.state["players"] if p["id"] != pid]
         for runde in lager.state["scores"].values():
             runde.pop(pid, None)
+        for i in range(ANTAL_RUNDER):
+            opdater_faerdig(i)
         lager.gem()
         return {"ok": True, "version": lager.state["version"]}
 
 
 @app.put("/api/scores/{r}/{pid}/{hul}")
-def gem_slag(r: int, pid: str, hul: int, data: Slag) -> dict[str, Any]:
+def gem_slag(r: int, pid: str, hul: int, data: Slag, x_golf_device: str | None = Header(default=None), x_golf_pin: str | None = Header(default=None)) -> dict[str, Any]:
     tjek_runde(r)
     if not 1 <= hul <= 18:
         raise HTTPException(404, "Hullet findes ikke")
     with lager.lock:
         p = find_spiller(pid)
+        kraev_ejer(p, x_golf_device, x_golf_pin)
         if lager.state["settings"]["rounds"][r]["closed"]:
             raise HTTPException(409, "Runden er lukket, så der kan ikke tastes flere scorer")
         if str(r) not in p["hcpByRound"]:
             raise HTTPException(409, "Bekræft dit HCP-index til runden, før du taster scorer")
+        kraev_ikke_frosset(r, x_golf_pin)
         kort = lager.state["scores"][str(r)].setdefault(pid, [None] * 18)
         kort[hul - 1] = data.strokes
         if all(s is None for s in kort):
             del lager.state["scores"][str(r)][pid]
+        opdater_faerdig(r)
         lager.gem()
         return {"ok": True, "version": lager.state["version"]}
 
@@ -446,11 +554,15 @@ def gem_opsaetning(data: Opsaetning, x_golf_pin: str | None = Header(default=Non
             if t.lengths is not None and (len(t.lengths) != 18 or any(not 0 <= x <= 999 for x in t.lengths)):
                 raise HTTPException(422, f"Længder for tee {t.name} skal være 18 tal i meter")
     with lager.lock:
+        gamle = lager.state["settings"]["rounds"]
+        nye = [rd.model_dump() for rd in data.rounds]
+        for ny, gammel in zip(nye, gamle):
+            ny["completedAt"] = gammel.get("completedAt")
         lager.state["settings"] = {
             "name": rens_navn(data.name),
             "allowance": data.allowance,
             "rules": data.rules,
-            "rounds": [rd.model_dump() for rd in data.rounds],
+            "rounds": nye,
         }
         lager.gem()
         return {"ok": True, "version": lager.state["version"]}
@@ -478,5 +590,6 @@ def nulstil(x_golf_pin: str | None = Header(default=None)) -> dict[str, Any]:
         lager.state["scores"] = {str(i): {} for i in range(ANTAL_RUNDER)}
         for rd in lager.state["settings"]["rounds"]:
             rd["closed"] = False
+            rd["completedAt"] = None
         lager.gem()
         return {"ok": True, "version": lager.state["version"]}

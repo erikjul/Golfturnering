@@ -402,16 +402,28 @@ Ret nedslagsmærker på green, læg tørv på plads, og læg hele riven ned i bu
 Drikkevand foran hul 1 og 10. Toiletter ved hul 10 og 13. Hjertestarter ved klubhusets dør. Shoppen: 86 59 22 18.`,
   };
 
+  /** Telefonens id: et tilfældigt nummer, der gemmes i browseren og låser dit navn til denne telefon. */
+  function deviceId() {
+    let id = ls.get("golf.device", null);
+    if (!id) {
+      const bytes = new Uint8Array(16);
+      if (window.crypto && crypto.getRandomValues) crypto.getRandomValues(bytes); else bytes.forEach((_, i) => (bytes[i] = Math.floor(Math.random() * 256)));
+      id = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+      ls.set("golf.device", id);
+    }
+    return id;
+  }
+
   function restApi() {
     async function call(method, url, body) {
-      const headers = { "Content-Type": "application/json" };
+      const headers = { "Content-Type": "application/json", "X-Golf-Device": deviceId() };
       const pin = ls.get("golf.pin", "");
       if (pin) headers["X-Golf-Pin"] = pin;
       const r = await fetch(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
       if (!r.ok) {
         let msg = "Noget gik galt (" + r.status + ")";
         try { const j = await r.json(); if (j.detail) msg = typeof j.detail === "string" ? j.detail : JSON.stringify(j.detail); } catch (e) { /* tom */ }
-        if (r.status === 401) msg = "Handlingen kræver den rigtige PIN. Skriv den under Opsætning.";
+        if (r.status === 401) msg = "Handlingen kræver arrangørens PIN.";
         throw new Error(msg);
       }
       return r.json();
@@ -425,6 +437,7 @@ Drikkevand foran hul 1 og 10. Toiletter ved hul 10 og 13. Hjertestarter ved klub
       confirm: (id, r, body) => call("PUT", `api/players/${id}/confirm/${r}`, body),
       unconfirm: (id, r) => call("DELETE", `api/players/${id}/confirm/${r}`),
       setCarry: (id, carry) => call("PUT", `api/players/${id}/carry`, { carry }),
+      releaseDevice: (id) => call("DELETE", `api/players/${id}/device`),
       setScore: (r, pid, hole, strokes) => call("PUT", `api/scores/${r}/${pid}/${hole}`, { strokes }),
       saveSettings: (s) => call("PUT", "api/settings", s),
       setClosed: (r, v) => call("POST", `api/rounds/${r}/closed?value=${v ? 1 : 0}`),
@@ -470,6 +483,7 @@ Drikkevand foran hul 1 og 10. Toiletter ved hul 10 og 13. Hjertestarter ved klub
         x.hcpByRound[r] = body.hcp; x.hcp = body.hcp; if (body.tee != null) x.tee = body.tee; save(); return { player: x };
       },
       async setCarry(id, carry) { const x = find(id); x.carry = carry; save(); return { player: x }; },
+      async releaseDevice() { return { ok: true }; },
       async unconfirm(id, r) {
         const x = find(id);
         if (st.scores[r][id]) throw new Error("Der er tastet scorer på runden");
@@ -543,6 +557,12 @@ Drikkevand foran hul 1 og 10. Toiletter ved hul 10 og 13. Hjertestarter ved klub
   const fmtTee = (course, teeName) => { const t = S.teeFor(course, teeName); return "tee " + t.name + " · CR " + String(t.cr).replace(".", ",") + " · slope " + t.slope; };
   const courseOf = (r) => state.settings.rounds[r];
   const scoresOf = (r) => state.scores[String(r)] || {};
+  let clockOffset = 0; // serverens ur minus telefonens, så frysning vurderes efter serverens tid
+  const serverNow = () => Date.now() / 1000 + clockOffset;
+  /** Runden er færdig og har været det i mere end et kvarter: rettelser kræver PIN. */
+  const roundFrozen = (r) => { const c = courseOf(r); return !!c.completedAt && serverNow() - c.completedAt > (state.freezeAfter || 900); };
+  /** Navnet er låst til en anden telefon. */
+  const lockedByOther = (p) => !!(p && p.locked && !p.mine);
 
   function standings(r) {
     const c = courseOf(r);
@@ -606,6 +626,19 @@ Drikkevand foran hul 1 og 10. Toiletter ved hul 10 og 13. Hjertestarter ved klub
     const confirmedHcp = m ? S.hcpForRound(m, round) : null;
     const hasScores = m ? !!scoresOf(round)[m.id] : false;
 
+    // Navnet bruges fra en anden telefon
+    if (m && lockedByOther(m)) {
+      el.innerHTML = `
+        <div class="who">
+          <div class="avatar">${esc(initials(m.name))}</div>
+          <div class="grow"><div class="name">${esc(m.name)}</div><div class="chips" style="margin-top:6px"><span class="chip warn">Bruges fra en anden telefon</span></div></div>
+          <button class="btn secondary small" id="btn-switch">Skift</button>
+        </div>
+        <p class="muted" style="font-size:13.5px;margin:12px 0 0">Navnet blev taget i brug fra en anden telefon og er låst til den. Du kan følge med i alt, men ikke taste for ${esc(m.name)}. Er det din egen nye telefon, så bed arrangøren frigive navnet under Opsætning.</p>`;
+      $("#btn-switch").onclick = () => { meId = null; editingMe = false; ls.set("golf.me", null); render(); };
+      return;
+    }
+
     // Valgt og bekræftet til runden
     if (m && confirmedHcp != null && !editingMe) {
       const ph = S.playingHandicap(confirmedHcp, c, state.settings.allowance, m.tee);
@@ -641,6 +674,7 @@ Drikkevand foran hul 1 og 10. Toiletter ved hul 10 og 13. Hjertestarter ved klub
           <label class="f" style="width:130px">HCP-index ${esc(day)}<input type="text" name="hcp" inputmode="decimal" value="${fmtHcp(confirmedHcp != null ? confirmedHcp : m.hcp)}" required ${hasScores ? 'title="Kræver PIN, da der er tastet scorer"' : ""}></label>
           ${teeSelect("tee", m.tee)}
           <button class="btn gold" type="submit">${editing ? "Gem" : "Bekræft"}</button>
+          ${!editing && !m.locked ? '<span class="muted" style="font-size:12.5px;flex-basis:100%">Bekræftelsen låser navnet til denne telefon.</span>' : ""}
           ${editing ? '<button class="btn secondary" type="button" id="btn-cancel-edit">Annullér</button>' : '<button class="btn secondary small" type="button" id="btn-edit-me">Ret navn</button>'}
         </form>
         <p class="muted" style="font-size:13px;margin:10px 0 0">${editing && hasScores ? "Der er tastet scorer på runden, så en ændring af indekset kræver PIN (skrives under Opsætning)." : "Tjek dit aktuelle indeks i Golfbox eller DGU-appen, og ret tallet, hvis det har ændret sig. Først når du har bekræftet, tæller du med på " + esc(day) + " og kan taste scorer."}</p>`;
@@ -665,7 +699,7 @@ Drikkevand foran hul 1 og 10. Toiletter ved hul 10 og 13. Hjertestarter ved klub
 
     // Ikke valgt: vælg dit navn på deltagerlisten, eller tilføj en ny spiller
     const opts = state.players.slice().sort((a, b) => a.name.localeCompare(b.name, "da"))
-      .map((p) => `<option value="${p.id}">${esc(p.name)}${p.dgu ? " · " + esc(p.dgu) : ""}</option>`).join("");
+      .map((p) => `<option value="${p.id}">${esc(p.name)}${p.dgu ? " · " + esc(p.dgu) : ""}${lockedByOther(p) ? " · på en anden telefon" : p.mine ? " · denne telefon" : ""}</option>`).join("");
     el.innerHTML = `
       <span class="eyebrow">Hvem er du?</span>
       ${state.players.length ? `
@@ -701,8 +735,10 @@ Drikkevand foran hul 1 og 10. Toiletter ved hul 10 og 13. Hjertestarter ved klub
     const m = me();
     const c = courseOf(round);
     if (!m) { el.innerHTML = `<div class="card empty">Vælg dit navn ovenfor for at taste din score.</div>`; return; }
+    if (lockedByOther(m)) { el.innerHTML = `<div class="card empty">${esc(m.name)} bruges fra en anden telefon. Vælg dit eget navn ovenfor.</div>`; return; }
     const mr = meForRound();
     if (!mr) { el.innerHTML = `<div class="card empty">Bekræft dit HCP-index til ${esc(dayLabel(c).toLowerCase())} ovenfor, så kan du taste din score.</div>`; return; }
+    const frozen = roundFrozen(round);
     const card = S.scorecard(mr, c, scoresOf(round)[m.id], state.settings.allowance);
     const lengths = teeLengths(c, m.tee);
     const st = standings(round);
@@ -714,7 +750,7 @@ Drikkevand foran hul 1 og 10. Toiletter ved hul 10 og 13. Hjertestarter ved klub
       <div class="row">
         <div class="grow"><h2>${esc(dayLabel(c))} ${esc(fmtDate(c.date))}</h2>
           <div class="muted num">${esc(c.course || "Bane ikke angivet")} · par ${totalPar} · ${esc(fmtTee(c, m.tee))}</div></div>
-        ${c.closed ? `<span class="status">Runden er lukket</span>` : nextHole ? "" : `<span class="status">Runden er færdig</span>`}
+        ${c.closed ? `<span class="status">Runden er lukket</span>` : frozen ? `<span class="status">Færdig og låst</span>` : nextHole ? "" : `<span class="status">Runden er færdig</span>`}
       </div>
       <div class="board num">
         <div><div class="v">${card.total}</div><div class="k">Point</div></div>
@@ -724,15 +760,16 @@ Drikkevand foran hul 1 og 10. Toiletter ved hul 10 og 13. Hjertestarter ved klub
       </div>
       <div class="holes">
         <div class="subtotal"><span>Hul · par · nøgle · længde</span><span>Slag</span><span>Point</span></div>
-        ${card.holes.slice(0, 9).map((h, i) => holeRow(h, nextHole && h.hole === nextHole.hole, c.closed, lengths ? lengths[i] : null)).join("")}
+        ${card.holes.slice(0, 9).map((h, i) => holeRow(h, nextHole && h.hole === nextHole.hole, c.closed || frozen, lengths ? lengths[i] : null)).join("")}
         <div class="subtotal"><span>Ud</span><span>${card.holes.slice(0, 9).reduce((s, h) => s + (h.strokes || 0), 0) || ""}</span><span>${card.front}</span></div>
-        ${card.holes.slice(9).map((h, i) => holeRow(h, nextHole && h.hole === nextHole.hole, c.closed, lengths ? lengths[i + 9] : null)).join("")}
+        ${card.holes.slice(9).map((h, i) => holeRow(h, nextHole && h.hole === nextHole.hole, c.closed || frozen, lengths ? lengths[i + 9] : null)).join("")}
+        ${frozen ? '<p class="muted" style="font-size:13px;margin:6px 0 0">Runden er færdig, og scorerne er låst. En rettelse kan kun laves af arrangøren.</p>' : ""}
         <div class="subtotal"><span>Ind</span><span>${card.holes.slice(9).reduce((s, h) => s + (h.strokes || 0), 0) || ""}</span><span>${card.back}</span></div>
         <div class="subtotal sum num"><span>Ud ${card.front} · Ind ${card.back} · spillehandicap ${card.playingHcp}</span><span class="big">${card.holes.reduce((s, h) => s + (h.strokes || 0), 0) || ""}</span><span class="big">${card.total}</span></div>
       </div>
     </div>`);
     el.innerHTML = parts.join("");
-    el.querySelectorAll(".hole").forEach((b) => (b.onclick = () => { if (!c.closed) openSheet(+b.dataset.hole); }));
+    el.querySelectorAll(".hole").forEach((b) => (b.onclick = () => { if (!c.closed && !frozen) openSheet(+b.dataset.hole); }));
   }
 
   const teeLengths = (course, teeName) => { const t = S.teeFor(course, teeName); return t.lengths && t.lengths.length === 18 ? t.lengths : null; };
@@ -855,6 +892,7 @@ Drikkevand foran hul 1 og 10. Toiletter ved hul 10 og 13. Hjertestarter ved klub
         ${d.rounds.map((r, i) => `<div class="round-set">
           <div class="row"><b class="grow">Runde ${i + 1}</b>
             ${i === 0 ? `<button class="btn secondary small" id="btn-copy">Kopiér bane til alle runder</button>` : ""}
+            ${state.settings.rounds[i].completedAt ? `<span class="chip accent">Færdig${roundFrozen(i) ? " · låst" : ""}</span>` : ""}
             <button class="btn ${r.closed ? "secondary" : "danger"} small" data-close="${i}">${r.closed ? "Genåbn runden" : "Luk runden nu"}</button>
           </div>
           <div class="two">
@@ -880,8 +918,8 @@ Drikkevand foran hul 1 og 10. Toiletter ved hul 10 og 13. Hjertestarter ved klub
         <div class="row"><button class="btn" id="btn-save-settings">Gem opsætning</button><button class="btn secondary" id="btn-discard">Fortryd ændringer</button></div>
         <details>
           <summary>Deltagerliste (${state.players.length}) · bekræftet ${esc(dayLabel(courseOf(round)).toLowerCase())}: ${state.players.filter((p) => S.hcpForRound(p, round) != null).length}</summary>
-          <p class="muted" style="font-size:13px">"Ret HCP" ændrer det bekræftede indeks for den valgte runde (${esc(dayLabel(courseOf(round)).toLowerCase())}) og kræver PIN, hvis der er tastet scorer. "Fjern" trækker spillerens deltagelse på runden tilbage. "Før" er medbragte ranglistepoint og kræver PIN at ændre.</p>
-          <div class="plist">${state.players.slice().sort((a, b) => a.name.localeCompare(b.name, "da")).map((p) => { const h = S.hcpForRound(p, round); return `<div><span class="grow">${esc(p.name)} <span class="muted num">${p.dgu ? esc(p.dgu) + " · " : ""}${h != null ? "HCP " + fmtHcp(h) + " bekræftet" : "ikke bekræftet (senest " + fmtHcp(p.hcp) + ")"} · før ${p.carry || 0} p</span></span><button class="btn secondary small" data-hcp="${p.id}">Ret HCP</button><button class="btn secondary small" data-carry="${p.id}">Før</button>${h != null ? `<button class="btn secondary small" data-unconfirm="${p.id}">Fjern</button>` : ""}<button class="btn danger small" data-del="${p.id}">Slet</button></div>`; }).join("") || '<p class="muted">Ingen på listen.</p>'}</div>
+          <p class="muted" style="font-size:13px">"Ret HCP" ændrer det bekræftede indeks for den valgte runde (${esc(dayLabel(courseOf(round)).toLowerCase())}) og kræver PIN, hvis der er tastet scorer. "Fjern" trækker spillerens deltagelse på runden tilbage. "Før" er medbragte ranglistepoint. "Frigiv" løsner navnet fra den telefon, det er låst til, så spilleren kan bruge en anden telefon. Alt her kræver PIN.</p>
+          <div class="plist">${state.players.slice().sort((a, b) => a.name.localeCompare(b.name, "da")).map((p) => { const h = S.hcpForRound(p, round); return `<div><span class="grow">${esc(p.name)} <span class="muted num">${p.dgu ? esc(p.dgu) + " · " : ""}${h != null ? "HCP " + fmtHcp(h) + " bekræftet" : "ikke bekræftet (senest " + fmtHcp(p.hcp) + ")"} · før ${p.carry || 0} p</span></span><button class="btn secondary small" data-hcp="${p.id}">Ret HCP</button><button class="btn secondary small" data-carry="${p.id}">Før</button>${p.locked ? `<button class="btn secondary small" data-release="${p.id}" title="Låst til en telefon">Frigiv 🔒</button>` : ""}${h != null ? `<button class="btn secondary small" data-unconfirm="${p.id}">Fjern</button>` : ""}<button class="btn danger small" data-del="${p.id}">Slet</button></div>`; }).join("") || '<p class="muted">Ingen på listen.</p>'}</div>
         </details>
         <details>
           <summary>Nulstil turneringen</summary>
@@ -971,13 +1009,20 @@ Drikkevand foran hul 1 og 10. Toiletter ved hul 10 og 13. Hjertestarter ved klub
       if (isNaN(carry) || carry < 0) return toast("Skriv et helt tal, fx 46");
       guarded(async () => { await api.setCarry(p.id, carry); });
     }));
+    el.querySelectorAll("[data-release]").forEach((b) => (b.onclick = () => {
+      const p = state.players.find((x) => x.id === b.dataset.release);
+      if (!confirm(`Frigiv ${p.name}s navn, så det kan bruges fra en anden telefon? Den næste, der bekræfter, låser det igen.`)) return;
+      guarded(async () => { await api.releaseDevice(p.id); toast(p.name + " er frigivet"); });
+    }));
     el.querySelectorAll("[data-unconfirm]").forEach((b) => (b.onclick = () => {
       const p = state.players.find((x) => x.id === b.dataset.unconfirm);
       if (!confirm(`Træk ${p.name}s deltagelse ${dayLabel(courseOf(round)).toLowerCase()} tilbage? Eventuelle scorer på runden slettes.`)) return;
       guarded(async () => { await api.unconfirm(p.id, round); });
     }));
     $("#btn-reset").onclick = () => {
-      if (!confirm("Slet ALLE scorer og bekræftelser og læg deltagerlisten ind igen? Det kan ikke fortrydes.")) return;
+      const svar = prompt("Dette sletter ALLE scorer og bekræftelser og lægger deltagerlisten ind igen. Skriv NULSTIL for at fortsætte:");
+      if (svar == null) return;
+      if (svar.trim().toUpperCase() !== "NULSTIL") return toast("Ikke nulstillet. Du skal skrive NULSTIL.");
       guarded(async () => { await api.reset(); meId = null; ls.set("golf.me", null); settingsDraft = null; });
     };
   }
@@ -1048,6 +1093,7 @@ Drikkevand foran hul 1 og 10. Toiletter ved hul 10 og 13. Hjertestarter ved klub
         if (!res.unchanged) {
           const first = !state;
           state = res;
+          if (res.serverTime) clockOffset = res.serverTime - Date.now() / 1000;
           if (first) round = defaultRound();
           render();
         }

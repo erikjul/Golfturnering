@@ -30,6 +30,13 @@ Alle, der har adressen, kan åbne den på telefonen, tilmelde sig og taste slag 
   point kan rettes under Opsætning med PIN.
 * **Banen:** huloversigt med par, handicapnøgle og længder pr. tee samt klubbens lokalregler og
   ordensregler (teksten kan rettes under Opsætning).
+* **Sikkerhed:** første bekræftelse låser navnet til spillerens telefon. Andre telefoner kan se alt,
+  men ikke taste for det navn. Skifter en spiller telefon, frigiver arrangøren navnet under
+  Opsætning med PIN. Når en runde er færdig (alle deltagere har 18 huller), kan scorer rettes i et
+  kvarter; derefter er runden låst, og rettelser kræver PIN. *Nulstil* kræver både PIN og at ordet
+  NULSTIL skrives. Alt farligt (baneopsætning, lukke runder, slette, rette handicap efter første
+  score, medbragte point, frigive navne, nulstille) kræver PIN; bekræftelse og scoreindtastning
+  kræver aldrig PIN.
 * **Opsætning (tandhjulet):** turneringens navn, bane, ét eller flere tees med course rating og
   slope, par og handicapnøgle pr. hul for hver runde (*Kopiér bane til alle runder* sparer tid),
   *Luk runden nu* hvis nogen aldrig får tastet færdig, og deltagerlisten med mulighed for at rette
@@ -111,6 +118,20 @@ efter adresse. En lille server hos Hetzner (CX22, Ubuntu 24.04) er rigelig.
 Opdatering: `git pull && docker compose up -d --build` i `/opt/golfturnering`. Data ligger i
 Docker-volumen `golfturnering_golf_data` og overlever opdateringer. En kopi af data hentes med
 `docker compose cp golf:/data/golf.json .`.
+
+## Sikkerhedskopier og gendannelse
+
+Appen gemmer selv en kopi pr. time i `/data/backup` (de seneste 48 timer), hver gang noget ændres.
+Se dem og gendan én sådan (i `/opt/golfturnering`):
+
+```bash
+docker compose exec golf ls -l /data/backup
+docker compose exec golf cp /data/backup/golf-20260918-14.json /data/golf.json
+docker compose restart golf
+```
+
+Filnavnet er dato og time (her 18/9 kl. 14 UTC, dvs. kl. 16 dansk sommertid). Hent en kopi ned til
+dig selv med `docker compose cp golf:/data/backup/golf-20260918-14.json .`.
 
 ## Tests
 

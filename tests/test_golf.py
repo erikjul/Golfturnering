@@ -196,6 +196,81 @@ def test_opsaetning_valideres(client):
     assert client.put("/api/settings", json=st, headers={"X-Golf-Pin": "1234"}).status_code == 422
 
 
+def test_navn_laases_til_telefon(client, golf):
+    st = client.get("/api/state").json()
+    p = next(q for q in st["players"] if q["name"] == "Erik Jul Nielsen")
+    assert p["locked"] is False and "device" not in p
+    A = {"X-Golf-Device": "tlf-a"}
+    B = {"X-Golf-Device": "tlf-b"}
+
+    # Første bekræftelse låser navnet til telefon A
+    r = client.put(f"/api/players/{p['id']}/confirm/0", json={"hcp": 17.5}, headers=A)
+    assert r.status_code == 200 and "device" not in r.json()["player"]
+    mig = next(q for q in client.get("/api/state", headers=A).json()["players"] if q["id"] == p["id"])
+    assert mig["locked"] is True and mig["mine"] is True
+    andre = next(q for q in client.get("/api/state", headers=B).json()["players"] if q["id"] == p["id"])
+    assert andre["locked"] is True and andre["mine"] is False
+
+    # Telefon B afvises, telefon A virker, PIN går igennem fra enhver telefon
+    assert client.put(f"/api/scores/0/{p['id']}/1", json={"strokes": 5}, headers=B).status_code == 403
+    assert client.put(f"/api/players/{p['id']}/confirm/0", json={"hcp": 17.5}, headers=B).status_code == 403
+    assert client.put(f"/api/players/{p['id']}", json={"tee": "49"}, headers=B).status_code == 403
+    assert client.delete(f"/api/players/{p['id']}/confirm/0", headers=B).status_code == 403
+    assert client.put(f"/api/scores/0/{p['id']}/1", json={"strokes": 5}, headers=A).status_code == 200
+    assert client.put(f"/api/scores/0/{p['id']}/2", json={"strokes": 5}, headers={**B, "X-Golf-Pin": "1234"}).status_code == 200
+
+    # Frigiv kræver PIN; derefter kan telefon B overtage, og A er lukket ude
+    assert client.delete(f"/api/players/{p['id']}/device").status_code == 401
+    assert client.delete(f"/api/players/{p['id']}/device", headers={"X-Golf-Pin": "1234"}).status_code == 200
+    assert client.put(f"/api/players/{p['id']}/confirm/0", json={"hcp": 17.5}, headers=B).status_code == 200
+    assert client.put(f"/api/scores/0/{p['id']}/3", json={"strokes": 5}, headers=A).status_code == 403
+    assert client.put(f"/api/scores/0/{p['id']}/3", json={"strokes": 5}, headers=B).status_code == 200
+
+    # En ny spiller låses til den telefon, der opretter den
+    ny = client.post("/api/players", json={"name": "Ny Spiller", "hcp": 20}, headers=A).json()["player"]
+    assert "device" not in ny
+    assert client.put(f"/api/players/{ny['id']}/confirm/0", json={"hcp": 20}, headers=B).status_code == 403
+    assert client.put(f"/api/players/{ny['id']}/confirm/0", json={"hcp": 20}, headers=A).status_code == 200
+
+
+def test_sikkerhedskopi_pr_time(client, golf):
+    client.post("/api/players", json={"name": "Backup Test", "hcp": 20})
+    filer = sorted(golf.BACKUP_DIR.glob("golf-*.json"))
+    assert len(filer) == 1 and "Backup Test" in filer[0].read_text(encoding="utf-8")
+    client.post("/api/players", json={"name": "Backup Test 2", "hcp": 20})
+    assert len(list(golf.BACKUP_DIR.glob("golf-*.json"))) == 1  # samme time: kopien overskrives
+
+
+def test_faerdig_runde_fryses_efter_et_kvarter(client, golf, monkeypatch):
+    st = client.get("/api/state").json()
+    a, b, c = st["players"][:3]
+    for p in (a, b):
+        client.put(f"/api/players/{p['id']}/confirm/0", json={"hcp": p["hcp"]})
+        for h in range(1, 19):
+            assert client.put(f"/api/scores/0/{p['id']}/{h}", json={"strokes": 4}).status_code == 200
+    rd = client.get("/api/state").json()["settings"]["rounds"][0]
+    assert rd["completedAt"] is not None
+
+    # Inden for kvarteret kan der stadig rettes uden PIN
+    assert client.put(f"/api/scores/0/{a['id']}/18", json={"strokes": 5}).status_code == 200
+
+    # Et kvarter senere er runden låst
+    rigtig_tid = golf.time.time
+    monkeypatch.setattr(golf.time, "time", lambda: rigtig_tid() + golf.FRYS_EFTER_SEK + 1)
+    assert client.put(f"/api/scores/0/{a['id']}/18", json={"strokes": 4}).status_code == 409
+    assert client.put(f"/api/players/{c['id']}/confirm/0", json={"hcp": c["hcp"]}).status_code == 409
+    assert client.delete(f"/api/players/{a['id']}/confirm/0").status_code == 409
+    # PIN går igennem; fjernes en score, er runden ikke længere færdig, og låsen forsvinder
+    assert client.put(f"/api/scores/0/{a['id']}/18", json={"strokes": 4}, headers={"X-Golf-Pin": "1234"}).status_code == 200
+    assert client.put(f"/api/scores/0/{a['id']}/18", json={"strokes": None}, headers={"X-Golf-Pin": "1234"}).status_code == 200
+    assert client.get("/api/state").json()["settings"]["rounds"][0]["completedAt"] is None
+    assert client.put(f"/api/scores/0/{a['id']}/18", json={"strokes": 4}).status_code == 200
+    assert client.get("/api/state").json()["settings"]["rounds"][0]["completedAt"] is not None
+    # Nulstil rydder også låsen
+    client.post("/api/reset", headers={"X-Golf-Pin": "1234"})
+    assert client.get("/api/state").json()["settings"]["rounds"][0]["completedAt"] is None
+
+
 JS_TEST = r"""
 const assert = require("assert");
 const S = require(process.argv[2]);
