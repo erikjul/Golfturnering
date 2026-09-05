@@ -1,0 +1,1003 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Golfturnering</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600;700&display=swap">
+<style>
+:root {
+  --ground: #EDF1EA;
+  --surface: #FFFFFF;
+  --surface-2: #E4EAE2;
+  --ink: #0F1F17;
+  --muted: #5B6B62;
+  --line: #D5DDD4;
+  --board: #0E3B2A;
+  --board-2: #155238;
+  --board-line: rgba(255,255,255,.10);
+  --board-ink: #F2F6F1;
+  --board-muted: #9FC2AE;
+  --accent: #1B7A4B;
+  --accent-ink: #FFFFFF;
+  --accent-soft: #DCEDE2;
+  --flag: #C63B2C;
+  --flag-soft: #F9E4E0;
+  --gold: #9A6F17;
+  --gold-bright: #E9B949;
+  --gold-soft: #F7EBCB;
+  --shadow: 0 14px 34px rgba(14, 59, 42, .18);
+  --shadow-sm: 0 2px 6px rgba(14, 59, 42, .10);
+  --display: "Bebas Neue", "Barlow Condensed", Impact, "Arial Narrow", sans-serif;
+  --body: "Barlow", "Helvetica Neue", Arial, sans-serif;
+  --r: 16px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #0A100D; --surface: #131B16; --surface-2: #1C2620; --ink: #E8EEE9; --muted: #98A99E; --line: #27342C;
+    --board: #0C3324; --board-2: #124631; --board-ink: #F2F6F1; --board-muted: #8FB49E;
+    --accent: #3FA96E; --accent-ink: #0A100D; --accent-soft: #17311F;
+    --flag: #E8685A; --flag-soft: #3A211E; --gold: #E0B24A; --gold-bright: #E9B949; --gold-soft: #3A2E12;
+    --shadow: 0 14px 34px rgba(0,0,0,.55); --shadow-sm: 0 2px 6px rgba(0,0,0,.4);
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #0A100D; --surface: #131B16; --surface-2: #1C2620; --ink: #E8EEE9; --muted: #98A99E; --line: #27342C;
+  --board: #0C3324; --board-2: #124631; --board-ink: #F2F6F1; --board-muted: #8FB49E;
+  --accent: #3FA96E; --accent-ink: #0A100D; --accent-soft: #17311F;
+  --flag: #E8685A; --flag-soft: #3A211E; --gold: #E0B24A; --gold-bright: #E9B949; --gold-soft: #3A2E12;
+  --shadow: 0 14px 34px rgba(0,0,0,.55); --shadow-sm: 0 2px 6px rgba(0,0,0,.4);
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--ground); color: var(--ink);
+  font: 16px/1.45 var(--body); min-height: 100vh; padding-bottom: env(safe-area-inset-bottom);
+}
+h1, h2, h3 { font-family: var(--display); font-weight: 400; margin: 0; text-wrap: balance; line-height: 1; letter-spacing: .01em; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
+  outline: 3px solid var(--gold-bright); outline-offset: 2px;
+}
+.num { font-variant-numeric: tabular-nums; }
+.hidden { display: none !important; }
+.disp { font-family: var(--display); font-weight: 400; letter-spacing: .02em; }
+
+/* ---------- Tavlen (header) ---------- */
+.top {
+  position: sticky; top: 0; z-index: 5; color: var(--board-ink);
+  background:
+    repeating-linear-gradient(180deg, transparent 0 3px, rgba(0,0,0,.09) 3px 4px),
+    linear-gradient(180deg, var(--board-2), var(--board) 70%);
+  box-shadow: 0 6px 18px rgba(0,0,0,.18);
+}
+.top::after { content: ""; display: block; height: 3px; background: linear-gradient(90deg, var(--gold-bright), #F6DC8E 40%, var(--gold-bright)); }
+.top-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; max-width: 760px; margin: 0 auto; padding: 14px 16px 6px; }
+.top-row > div:first-child { min-width: 0; }
+.top h1 { font-size: clamp(26px, 7.5vw, 40px); letter-spacing: .03em; text-transform: uppercase; text-shadow: 0 2px 0 rgba(0,0,0,.25); overflow-wrap: anywhere; }
+.top .sub { font-size: 12.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--board-muted); font-weight: 600; margin-top: 2px; }
+.icon-btn {
+  background: rgba(255,255,255,.08); border: 1px solid var(--board-line); color: inherit; width: 42px; height: 42px; border-radius: 50%;
+  display: grid; place-items: center; flex: none;
+}
+.icon-btn:hover { background: rgba(255,255,255,.16); }
+.rounds { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; max-width: 760px; margin: 0 auto; padding: 4px 16px 10px; }
+.rounds button {
+  background: rgba(0,0,0,.22); border: 1px solid var(--board-line); border-radius: 10px; color: var(--board-muted);
+  padding: 8px 6px 7px; font-family: var(--display); font-size: 24px; letter-spacing: .04em; line-height: 1; text-transform: uppercase;
+  position: relative; transition: background .15s, color .15s;
+}
+.rounds button small { display: block; font-family: var(--body); font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; margin-top: 4px; opacity: .85; }
+.rounds button[aria-selected="true"] { background: rgba(255,255,255,.10); color: var(--board-ink); border-color: rgba(255,255,255,.28); }
+.rounds button[aria-selected="true"]::after { content: ""; position: absolute; left: 14px; right: 14px; bottom: -1px; height: 3px; border-radius: 3px 3px 0 0; background: var(--gold-bright); }
+.rounds button small.done { color: var(--gold-bright); }
+
+main { max-width: 760px; margin: 0 auto; padding: 16px 14px 110px; display: grid; gap: 14px; }
+
+/* ---------- Faner ---------- */
+.views { display: grid; grid-template-columns: repeat(4, 1fr); background: var(--surface-2); border-radius: 999px; padding: 4px; gap: 4px; }
+.views button {
+  border: 0; background: transparent; padding: 9px 4px; border-radius: 999px; font-weight: 600; color: var(--muted); font-size: 15px;
+  transition: background .15s, color .15s;
+}
+.views button[aria-selected="true"] { background: var(--board); color: var(--board-ink); box-shadow: var(--shadow-sm); }
+
+/* ---------- Kort ---------- */
+.card { background: var(--surface); border-radius: var(--r); padding: 16px; border: 1px solid var(--line); box-shadow: var(--shadow-sm); }
+.card h2 { font-size: 30px; margin-bottom: 4px; }
+.card p { margin: 6px 0; }
+.eyebrow { font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+.muted { color: var(--muted); }
+.row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.grow { flex: 1; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px; background: var(--surface-2); font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.chip b { color: var(--ink); font-weight: 700; }
+.chip.accent { background: var(--accent-soft); color: var(--accent); }
+.chip.accent b { color: var(--accent); }
+.chip.warn { background: var(--flag-soft); color: var(--flag); }
+
+/* ---------- Formularer ---------- */
+label.f { display: grid; gap: 4px; font-size: 13px; font-weight: 600; color: var(--muted); letter-spacing: .02em; }
+input[type=text], input[type=number], input[type=password], input[type=date], select, textarea {
+  width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--ground); color: var(--ink);
+  font-weight: 500;
+}
+textarea { resize: vertical; line-height: 1.4; font-size: 14px; }
+input[type=number] { font-variant-numeric: tabular-nums; }
+.btn {
+  border: 0; border-radius: 999px; padding: 11px 18px; font-weight: 700; background: var(--accent); color: var(--accent-ink);
+  letter-spacing: .01em; box-shadow: var(--shadow-sm); transition: transform .1s, filter .15s;
+}
+.btn:hover { filter: brightness(1.06); }
+.btn:active { transform: scale(.98); }
+.btn.secondary { background: var(--surface-2); color: var(--ink); box-shadow: none; }
+.btn.danger { background: var(--flag-soft); color: var(--flag); box-shadow: none; }
+.btn.small { padding: 7px 13px; font-size: 14px; }
+.btn.gold { background: var(--gold-bright); color: #2A2008; }
+.btn:disabled { opacity: .5; cursor: default; }
+.check { display: flex; align-items: center; gap: 8px; font-weight: 500; }
+.check input { width: 20px; height: 20px; accent-color: var(--accent); }
+.rules h3 { font-size: 22px; margin: 16px 0 6px; }
+.rules p { margin: 4px 0; font-size: 14.5px; }
+.rules p.n { padding-left: 1.4em; text-indent: -1.4em; }
+
+/* ---------- Spilleren ---------- */
+.who { display: flex; align-items: center; gap: 12px; }
+.avatar {
+  width: 48px; height: 48px; border-radius: 50%; background: var(--board); color: var(--gold-bright);
+  display: grid; place-items: center; font-family: var(--display); font-size: 22px; letter-spacing: .04em; flex: none;
+  box-shadow: inset 0 0 0 2px rgba(255,255,255,.12), var(--shadow-sm);
+}
+.who .name { font-family: var(--display); font-size: 26px; letter-spacing: .02em; line-height: 1; }
+.who .hcp { margin-top: 5px; }
+
+/* ---------- Scorekort ---------- */
+.board {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; border-radius: 12px; overflow: hidden;
+  background: var(--board-line); color: var(--board-ink); box-shadow: var(--shadow-sm);
+}
+.board > div {
+  background:
+    repeating-linear-gradient(180deg, transparent 0 3px, rgba(0,0,0,.08) 3px 4px),
+    linear-gradient(180deg, var(--board-2), var(--board));
+  padding: 12px 6px 10px; text-align: center; display: grid; gap: 4px; align-content: center;
+}
+.board .v { font-family: var(--display); font-size: 40px; line-height: .9; color: var(--gold-bright); letter-spacing: .02em; text-shadow: 0 2px 0 rgba(0,0,0,.3); }
+.board .v.plain { color: var(--board-ink); }
+.board .k { font-size: 10.5px; text-transform: uppercase; letter-spacing: .1em; color: var(--board-muted); font-weight: 700; }
+@media (prefers-reduced-motion: no-preference) { .board .v { animation: pop .3s ease-out; } }
+@keyframes pop { from { transform: translateY(4px); opacity: .4; } to { transform: none; opacity: 1; } }
+
+.holes { display: grid; gap: 5px; }
+.hole {
+  display: grid; grid-template-columns: 40px 1fr 54px 54px; align-items: center; gap: 8px;
+  width: 100%; text-align: left; background: var(--ground); border: 1px solid transparent; border-radius: 12px; padding: 7px 8px 7px 8px;
+  transition: border-color .15s, background .15s;
+}
+.hole:hover { border-color: var(--line); background: var(--surface-2); }
+.hole.next { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+.hole .h {
+  width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--surface); border: 1px solid var(--line);
+  font-family: var(--display); font-size: 21px; line-height: 1; padding-top: 2px;
+}
+.hole.next .h { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.hole .meta { font-size: 12.5px; color: var(--muted); line-height: 1.35; min-width: 0; }
+.hole .meta .l2 { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.hole .meta b { color: var(--ink); font-weight: 700; }
+.hole .dots { display: inline-block; padding: 1px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 11.5px; white-space: nowrap; }
+.hole .dots.minus { background: var(--flag-soft); color: var(--flag); }
+.hole .strokes, .hole .pts { font-family: var(--display); font-size: 26px; line-height: 1; text-align: center; padding-top: 2px; }
+.hole .strokes.empty { color: var(--line); }
+.hole .strokes.streg { font-family: var(--body); font-size: 12px; font-weight: 700; color: var(--flag); text-transform: uppercase; letter-spacing: .06em; }
+.hole .pts { height: 38px; display: grid; place-items: center; border-radius: 9px; background: var(--surface); border: 1px solid var(--line); }
+.hole .pts.none { background: transparent; border-color: transparent; }
+.pts.p0 { color: var(--flag); border-color: var(--flag-soft); background: var(--flag-soft); }
+.pts.p1 { color: var(--muted); }
+.pts.p3 { background: var(--accent-soft); color: var(--accent); border-color: var(--accent-soft); }
+.pts.p4 { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.pts.p5 { background: var(--gold-bright); color: #2A2008; border-color: var(--gold-bright); }
+.subtotal { display: grid; grid-template-columns: 1fr 54px 54px; gap: 8px; padding: 6px 10px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 700; text-align: center; }
+.subtotal span:first-child { text-align: left; }
+.subtotal.sum { background: var(--surface-2); border-radius: 10px; padding: 8px 10px; text-transform: none; letter-spacing: 0; font-size: 14px; }
+.subtotal.sum .big { font-family: var(--display); font-size: 22px; line-height: 1; }
+
+/* ---------- Rangliste ---------- */
+table { width: 100%; border-collapse: collapse; }
+.tbl-wrap { overflow-x: auto; margin: 0 -16px; padding: 0 16px; }
+th { text-align: left; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 700; padding: 6px 6px; border-bottom: 1px solid var(--line); }
+td { padding: 10px 6px; border-bottom: 1px solid var(--line); vertical-align: middle; white-space: nowrap; }
+td.name { white-space: normal; width: 100%; }
+tr:last-child td { border-bottom: 0; }
+td.r, th.r { text-align: right; }
+td.c, th.c { text-align: center; }
+tr.me td { background: var(--accent-soft); }
+tr.me td:first-child { border-radius: 10px 0 0 10px; }
+tr.me td:last-child { border-radius: 0 10px 10px 0; }
+tr.lead td:first-child { box-shadow: inset 4px 0 0 var(--gold-bright); }
+.rank { font-family: var(--display); font-size: 28px; line-height: 1; width: 40px; padding-top: 3px; }
+.rank sup { font-family: var(--body); font-size: 11px; font-weight: 700; color: var(--muted); vertical-align: top; }
+.pname { font-weight: 700; font-size: 16.5px; }
+.psub { font-size: 12.5px; color: var(--muted); margin-top: 1px; }
+.big { font-family: var(--display); font-size: 30px; line-height: 1; }
+.move { display: inline-block; font-size: 11.5px; font-weight: 700; min-width: 30px; text-align: center; padding: 2px 5px; border-radius: 999px; }
+.move.up { color: var(--accent); background: var(--accent-soft); }
+.move.down { color: var(--flag); background: var(--flag-soft); }
+.move.same { color: var(--line); }
+.thru { display: inline-block; min-width: 30px; padding: 3px 6px; border-radius: 999px; font-weight: 700; font-size: 13px; background: var(--surface-2); color: var(--muted); }
+.thru.f { background: var(--board); color: var(--gold-bright); }
+.tp { display: inline-block; min-width: 38px; text-align: center; padding: 4px 6px 2px; border-radius: 9px; background: var(--surface-2); font-family: var(--display); font-size: 22px; line-height: 1; }
+.tp.win { background: var(--gold-bright); color: #2A2008; }
+
+.winner {
+  border-radius: var(--r); padding: 18px 18px 16px; display: flex; gap: 16px; align-items: center; color: var(--board-ink);
+  background:
+    repeating-linear-gradient(180deg, transparent 0 3px, rgba(0,0,0,.08) 3px 4px),
+    linear-gradient(135deg, var(--board-2), var(--board));
+  box-shadow: var(--shadow); border: 1px solid rgba(233,185,73,.45);
+}
+.winner .trophy { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; background: var(--gold-bright); font-size: 30px; flex: none; box-shadow: 0 4px 12px rgba(0,0,0,.3); }
+.winner h2 { font-size: 15px; letter-spacing: .14em; text-transform: uppercase; color: var(--gold-bright); font-family: var(--body); font-weight: 700; }
+.winner .who { font-family: var(--display); font-size: 40px; line-height: .95; margin: 4px 0 6px; letter-spacing: .02em; }
+.winner .muted { color: var(--board-muted); }
+.status { padding: 11px 14px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); font-size: 14px; font-weight: 500; }
+.status.live::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-right: 8px; animation: blink 1.6s infinite; box-shadow: 0 0 0 3px var(--accent-soft); }
+@keyframes blink { 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .status.live::before { animation: none; } .board .v { animation: none; } }
+
+/* ---------- Opsætning ---------- */
+.grid18 { display: grid; grid-template-columns: repeat(9, 1fr); gap: 4px; }
+.grid18 input { padding: 6px 2px; text-align: center; border-radius: 6px; }
+.grid18 .lab { font-size: 11px; color: var(--muted); text-align: center; }
+.round-set { border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: grid; gap: 10px; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.four { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+@media (max-width: 480px) { .four { grid-template-columns: 1fr 1fr; } }
+.plist { display: grid; gap: 6px; }
+.plist div { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+details summary { cursor: pointer; font-weight: 600; padding: 6px 0; }
+
+/* ---------- Taltastatur ---------- */
+.sheet-bg { position: fixed; inset: 0; background: rgba(8, 20, 14, .55); z-index: 20; display: none; backdrop-filter: blur(2px); }
+.sheet-bg.open { display: block; }
+.sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 21; background: var(--surface); border-radius: 22px 22px 0 0;
+  padding: 0 16px calc(16px + env(safe-area-inset-bottom)); box-shadow: var(--shadow); transform: translateY(105%);
+  transition: transform .22s cubic-bezier(.2,.8,.2,1); max-width: 760px; margin: 0 auto; overflow: hidden;
+}
+.sheet:not(.open) { visibility: hidden; transition: transform .22s ease-out, visibility 0s .22s; }
+.sheet.open { transform: translateY(0); }
+@media (prefers-reduced-motion: reduce) { .sheet { transition: none; } }
+.sheet-head {
+  position: relative; margin: 0 -16px 12px; padding: 16px 18px 12px; color: var(--board-ink);
+  background: repeating-linear-gradient(180deg, transparent 0 3px, rgba(0,0,0,.08) 3px 4px), linear-gradient(180deg, var(--board-2), var(--board));
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+}
+.sheet-head::before { content: ""; position: absolute; left: 50%; top: 6px; width: 40px; height: 4px; border-radius: 4px; background: rgba(255,255,255,.35); transform: translateX(-50%); }
+.sheet h2 { font-size: 36px; }
+.sheet h2 small { font-family: var(--body); font-size: 13px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--board-muted); margin-left: 8px; }
+.sheet .info { color: var(--muted); font-size: 13.5px; margin: 0 0 12px; font-weight: 500; }
+.sheet .info b { color: var(--accent); }
+.pad { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.pad button {
+  border: 1px solid var(--line); border-radius: 14px; background: var(--ground); padding: 6px 0 4px; height: 64px;
+  font-family: var(--display); font-size: 30px; line-height: 1; display: grid; place-items: center; gap: 1px; transition: transform .08s, background .12s;
+}
+.pad button small { font-family: var(--body); font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.pad button.par { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.pad button.par small { color: var(--accent); }
+.pad button.cur { background: var(--board); color: var(--gold-bright); border-color: var(--board); }
+.pad button.cur small { color: var(--board-muted); }
+.pad button.streg { background: var(--flag-soft); color: var(--flag); border-color: var(--flag-soft); font-family: var(--body); font-size: 15px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+.pad button.ryd { background: transparent; font-family: var(--body); font-size: 14px; font-weight: 700; color: var(--muted); }
+.pad button:active { transform: scale(.96); }
+.sheet .nav { display: flex; justify-content: space-between; margin-top: 12px; gap: 8px; }
+
+/* ---------- Diverse ---------- */
+.toast {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--board); color: var(--board-ink);
+  padding: 11px 18px; border-radius: 999px; font-weight: 600; z-index: 30; box-shadow: var(--shadow); max-width: 90vw; border: 1px solid rgba(233,185,73,.4);
+}
+.empty { text-align: center; color: var(--muted); padding: 22px 8px; }
+.demo-note { font-size: 13px; padding: 9px 12px; border-radius: 10px; background: var(--gold-soft); color: var(--gold); font-weight: 500; }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-row">
+    <div>
+      <h1 id="title">Golfturnering</h1>
+      <div class="sub" id="subtitle">18.–20. september 2026 · Stableford</div>
+    </div>
+    <button class="icon-btn" id="btn-settings" aria-label="Opsætning" title="Opsætning">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+    </button>
+  </div>
+  <div class="rounds" id="rounds" role="tablist"></div>
+</header>
+
+<main id="main">
+  <div id="demo-note" class="demo-note hidden">Prøveversion: data gemmes kun i denne browser og deles ikke med andre.</div>
+
+  <!-- Hvem er du -->
+  <section class="card" id="me-card"></section>
+
+  <div class="views" role="tablist" id="views">
+    <button role="tab" data-view="score" aria-selected="true">Scorekort</button>
+    <button role="tab" data-view="board" aria-selected="false">Stilling</button>
+    <button role="tab" data-view="overall" aria-selected="false">Samlet</button>
+    <button role="tab" data-view="course" aria-selected="false">Banen</button>
+  </div>
+
+  <section id="view-score"></section>
+  <section id="view-board" class="hidden"></section>
+  <section id="view-overall" class="hidden"></section>
+  <section id="view-course" class="hidden"></section>
+  <section id="view-settings" class="hidden"></section>
+</main>
+
+<div class="sheet-bg" id="sheet-bg"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+  <div class="sheet-head"><h2 id="sheet-title">Hul 1</h2><span class="disp" id="sheet-side" style="font-size:20px;color:var(--board-muted)"></span></div>
+  <div class="info" id="sheet-info"></div>
+  <div class="pad" id="pad"></div>
+  <div class="nav">
+    <button class="btn secondary small" id="sheet-prev">‹ Forrige hul</button>
+    <button class="btn secondary small" id="sheet-close">Luk</button>
+    <button class="btn secondary small" id="sheet-next">Næste hul ›</button>
+  </div>
+</div>
+
+<script src="static/scoring.js"></script>
+<script>
+(function () {
+  "use strict";
+  const S = window.Scoring;
+  const $ = (sel) => document.querySelector(sel);
+  const ROUND_COUNT = 3;
+  const DAY_NAMES = ["søndag", "mandag", "tirsdag", "onsdag", "torsdag", "fredag", "lørdag"];
+
+  // ---------- lager: server-API eller lokal prøveversion ----------
+  const ls = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* ingen lagring */ } },
+  };
+
+  // Samsø Golfklub, 18 hullers bane, fra klubbens baneguide. Bruges til prøveversionen og til at
+  // udfylde længder automatisk, når et tee med navnet 49, 56 eller 61 tilføjes under Opsætning.
+  const SAMSOE = {
+    par: [4, 4, 5, 3, 4, 4, 4, 3, 5, 5, 3, 4, 4, 5, 3, 4, 4, 4],
+    si: [13, 9, 3, 15, 1, 11, 7, 17, 5, 2, 16, 6, 12, 8, 18, 10, 4, 14],
+    lengths: {
+      "49": [265, 310, 395, 120, 305, 280, 275, 125, 385, 385, 115, 280, 275, 390, 120, 300, 315, 245],
+      "56": [320, 350, 445, 140, 345, 320, 320, 150, 435, 435, 130, 325, 330, 435, 145, 345, 360, 285],
+      "61": [336, 380, 485, 173, 345, 346, 320, 172, 438, 452, 149, 359, 330, 512, 172, 416, 370, 340],
+    },
+    rules: `## Lokalregler (Samsø Golfklub)
+Banemarkeringer: hvide = out of bounds, røde = strafområde, blå = areal under reparation, grøn top = spilleforbud.
+1. Out of bounds defineres som linjen mellem de banenære punkter af hvide pæle i jordhøjde.
+2. Alle veje og stier på banen, også kunstigt overfladebelagte, behandles som integrerede genstande.
+3. Alle pæle på banen behandles som ikke-flytbare forhindringer: lempelse uden straf efter Regel 16.1. Lempelse må ikke tages efter Regel 15.2.
+4. Provisorisk bold ved bold i strafområde på hul 5, 7, 11, 14 og 17: Ved du ikke, om bolden er i strafområdet, kan du spille en provisorisk bold efter Regel 18.3. Findes den oprindelige bold i strafområdet inden for 3 minutter, vælger du enten at spille den, som den ligger (den provisoriske bold opgives, og slag med den tæller ikke), eller at fortsætte med den provisoriske bold. Findes den ikke, eller er det så godt som sikkert, at den er i strafområdet, er den provisoriske bold i spil. Straf for overtrædelse: den generelle straf.
+5. Elhegn og installationer omkring fårefolde er ikke-flytbare forhindringer. Generer de sving eller stance, kan der tages lempelse uden straf efter Regel 16.1a.
+6. Fåreindhegninger er områder med spilleforbud (unormalt baneforhold). Lempelse uden straf skal tages efter Regel 16.1f. Straf for overtrædelse: hulspil tab af hul, slagspil 2 strafslag.
+## Ordensregler
+Afstandspæle i siden af fairway: gule 150 m, røde 100 m, blå 50 m til forkant af green.
+Bolde slået out of bounds må ikke afhentes på nabojord.
+Hul 1 og 18: slå ikke ud, før forangående bold er på green.
+Hul 13: slå ikke ud, før du har hørt klokken.
+Hul 4 og 8: slå ikke ud, hvis der er færdsel på vejen.
+Hul 7, tee 56: slå ikke ud, hvis der er spillere på hul 18 på tee 61 eller 56.
+Max 4-bold. En runde bør højst tage 4 timer og 30 minutter. Luk hurtigere spillere igennem.
+Ret nedslagsmærker på green, læg tørv på plads, og læg hele riven ned i bunkeren.
+Drikkevand foran hul 1 og 10. Toiletter ved hul 10 og 13. Hjertestarter ved klubhusets dør. Shoppen: 86 59 22 18.`,
+  };
+
+  function restApi() {
+    async function call(method, url, body) {
+      const headers = { "Content-Type": "application/json" };
+      const pin = ls.get("golf.pin", "");
+      if (pin) headers["X-Golf-Pin"] = pin;
+      const r = await fetch(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+      if (!r.ok) {
+        let msg = "Noget gik galt (" + r.status + ")";
+        try { const j = await r.json(); if (j.detail) msg = typeof j.detail === "string" ? j.detail : JSON.stringify(j.detail); } catch (e) { /* tom */ }
+        if (r.status === 401) msg = "Handlingen kræver den rigtige PIN. Skriv den under Opsætning.";
+        throw new Error(msg);
+      }
+      return r.json();
+    }
+    return {
+      demo: false,
+      state: (since) => call("GET", "api/state?since=" + (since || 0)),
+      addPlayer: (p) => call("POST", "api/players", p),
+      updatePlayer: (id, p) => call("PUT", "api/players/" + id, p),
+      deletePlayer: (id) => call("DELETE", "api/players/" + id),
+      setScore: (r, pid, hole, strokes) => call("PUT", `api/scores/${r}/${pid}/${hole}`, { strokes }),
+      saveSettings: (s) => call("PUT", "api/settings", s),
+      setClosed: (r, v) => call("POST", `api/rounds/${r}/closed?value=${v ? 1 : 0}`),
+      reset: () => call("POST", "api/reset"),
+    };
+  }
+
+  function localApi() {
+    // Samme snitflade som serveren, men alt ligger i localStorage (kun til at prøve appen af).
+    const PAR = SAMSOE.par, SI = SAMSOE.si;
+    function fresh() {
+      return {
+        version: 1,
+        settings: {
+          name: "Golfturnering 2026", allowance: 100, rules: SAMSOE.rules,
+          rounds: [["2026-09-18", "Fredag"], ["2026-09-19", "Lørdag"], ["2026-09-20", "Søndag"]].map(([date, label]) => ({
+            date, label, course: "Samsø Golfklub", tees: [{ name: "56", cr: 70.8, slope: 131, lengths: SAMSOE.lengths["56"].slice() }, { name: "49", cr: 66.9, slope: 122, lengths: SAMSOE.lengths["49"].slice() }], par: PAR.slice(), si: SI.slice(), closed: false,
+          })),
+        },
+        players: [], scores: { 0: {}, 1: {}, 2: {} },
+      };
+    }
+    let st = ls.get("golf.demo", null) || fresh();
+    const save = () => { st.version++; ls.set("golf.demo", st); };
+    const find = (id) => { const p = st.players.find((x) => x.id === id); if (!p) throw new Error("Spilleren findes ikke"); return p; };
+    return {
+      demo: true,
+      async state(since) { return since === st.version ? { unchanged: true, version: since } : JSON.parse(JSON.stringify({ ...st, pinRequired: false })); },
+      async addPlayer(p) {
+        if (st.players.some((x) => x.name.toLowerCase() === p.name.toLowerCase())) throw new Error("Der er allerede en spiller med det navn");
+        const player = { id: "p" + Math.random().toString(16).slice(2, 10), name: p.name, hcp: p.hcp, tee: p.tee || "", absent: [false, false, false], created: Date.now() / 1000 };
+        st.players.push(player); save(); return { player };
+      },
+      async updatePlayer(id, p) { const x = find(id); Object.assign(x, p); save(); return { player: x }; },
+      async deletePlayer(id) { st.players = st.players.filter((x) => x.id !== id); Object.values(st.scores).forEach((r) => delete r[id]); save(); return { ok: true }; },
+      async setScore(r, pid, hole, strokes) {
+        if (st.settings.rounds[r].closed) throw new Error("Runden er lukket");
+        const card = st.scores[r][pid] || (st.scores[r][pid] = Array(18).fill(null));
+        card[hole - 1] = strokes; if (card.every((s) => s == null)) delete st.scores[r][pid]; save(); return { ok: true };
+      },
+      async saveSettings(s) { st.settings = s; save(); return { ok: true }; },
+      async setClosed(r, v) { st.settings.rounds[r].closed = v; save(); return { ok: true }; },
+      async reset() { st = fresh(); save(); return { ok: true }; },
+    };
+  }
+
+  // ---------- tilstand ----------
+  let api = null;
+  let state = null;           // seneste tilstand fra lageret
+  let round = 0;              // valgt runde 0..2
+  let view = "score";         // score | board | overall | settings
+  let meId = ls.get("golf.me", null);
+  let sheetHole = null;       // åbent hul i numpad (1..18) eller null
+  let editingMe = false;
+  let settingsDraft = null;   // igangværende redigering af opsætning (bevares ved genindlæsning)
+  const rankMemo = ls.get("golf.rank", {}); // {round: {pid: {rank, move}}}
+
+  const fmtHcp = (h) => (h == null ? "" : (Math.round(h * 10) / 10).toFixed(1).replace(".", ","));
+  const parseNum = (s) => { const v = parseFloat(String(s).replace(",", ".")); return Number.isFinite(v) ? v : NaN; };
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const initials = (n) => n.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
+  const fmtSigned = (n) => (n > 0 ? "+" + n : String(n));
+  function fmtDate(iso) {
+    const d = new Date(iso + "T12:00:00");
+    if (isNaN(d)) return iso;
+    return d.getDate() + "/" + (d.getMonth() + 1);
+  }
+  function dayLabel(r) {
+    const d = new Date(r.date + "T12:00:00");
+    const name = isNaN(d) ? r.label : DAY_NAMES[d.getDay()];
+    return name.charAt(0).toUpperCase() + name.slice(1);
+  }
+
+  let toastTimer = null;
+  function toast(msg) {
+    let t = $("#toast");
+    if (!t) { t = document.createElement("div"); t.id = "toast"; t.className = "toast"; t.setAttribute("role", "status"); document.body.appendChild(t); }
+    t.textContent = msg; t.classList.remove("hidden");
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.add("hidden"), 3500);
+  }
+  async function guarded(fn) {
+    try { await fn(); await refresh(true); } catch (e) { toast(e.message || String(e)); }
+  }
+
+  const me = () => (state ? state.players.find((p) => p.id === meId) : null) || null;
+  /** Alle tee-navne i turneringen (på tværs af runder), i den rækkefølge de er sat op. */
+  function teeNames() {
+    const names = [];
+    state.settings.rounds.forEach((r) => (r.tees || []).forEach((t) => { if (!names.includes(t.name)) names.push(t.name); }));
+    return names;
+  }
+  const teeSelect = (id, current) => {
+    const names = teeNames();
+    if (names.length < 2) return "";
+    return `<label class="f" style="width:110px">Tee<select name="${id}">${names.map((n) => `<option value="${esc(n)}" ${n === (current || names[0]) ? "selected" : ""}>${esc(n)}</option>`).join("")}</select></label>`;
+  };
+  const fmtTee = (course, teeName) => { const t = S.teeFor(course, teeName); return "tee " + t.name + " · CR " + String(t.cr).replace(".", ",") + " · slope " + t.slope; };
+  const courseOf = (r) => state.settings.rounds[r];
+  const scoresOf = (r) => state.scores[String(r)] || {};
+
+  function standings(r) {
+    const c = courseOf(r);
+    const res = S.roundStandings(state.players, c, scoresOf(r), r, state.settings.allowance, c.closed);
+    // Husk placeringsændringer, så man kan se hvem der rykker op og ned
+    const memo = rankMemo[r] || (rankMemo[r] = {});
+    let changed = false;
+    res.rows.forEach((row) => {
+      const m = memo[row.id];
+      if (!m) { memo[row.id] = { rank: row.rank, move: 0 }; changed = true; }
+      else if (m.rank !== row.rank) { m.move = m.rank - row.rank; m.rank = row.rank; changed = true; }
+      row.move = memo[row.id].move;
+    });
+    if (changed) ls.set("golf.rank", rankMemo);
+    return res;
+  }
+
+  function defaultRound() {
+    const today = new Date();
+    const iso = today.getFullYear() + "-" + String(today.getMonth() + 1).padStart(2, "0") + "-" + String(today.getDate()).padStart(2, "0");
+    const idx = state.settings.rounds.findIndex((r) => r.date === iso);
+    if (idx >= 0) return idx;
+    for (let i = 0; i < ROUND_COUNT; i++) if (!standings(i).complete) return i;
+    return ROUND_COUNT - 1;
+  }
+
+  // ---------- rendering ----------
+  function render() {
+    if (!state) return;
+    $("#title").textContent = state.settings.name || "Golfturnering";
+    document.title = state.settings.name || "Golfturnering";
+    const rs = state.settings.rounds;
+    $("#subtitle").textContent = fmtDate(rs[0].date) + "–" + fmtDate(rs[2].date) + " · Stableford · " + state.players.length + " spillere";
+    renderRounds();
+    renderMe();
+    document.querySelectorAll("#views button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.view === view)));
+    $("#views").classList.toggle("hidden", view === "settings");
+    ["score", "board", "overall", "course", "settings"].forEach((v) => $("#view-" + v).classList.toggle("hidden", v !== view));
+    if (view === "score") renderScore();
+    if (view === "board") renderBoard();
+    if (view === "overall") renderOverall();
+    if (view === "course") renderCourse();
+    if (view === "settings") renderSettings();
+    if (sheetHole) renderSheet();
+  }
+
+  function renderRounds() {
+    const el = $("#rounds");
+    el.innerHTML = state.settings.rounds.map((r, i) => {
+      const st = standings(i);
+      const tag = st.complete ? "✓ færdig" : r.closed ? "lukket" : fmtDate(r.date);
+      return `<button role="tab" data-round="${i}" aria-selected="${i === round}">${esc(dayLabel(r))}<small class="${st.complete ? "done" : ""}">${esc(tag)}</small></button>`;
+    }).join("");
+  }
+
+  function renderMe() {
+    const el = $("#me-card");
+    const m = me();
+    if (m && !editingMe) {
+      const c = courseOf(round);
+      const ph = S.playingHandicap(m.hcp, c, state.settings.allowance, m.tee);
+      const tee = S.teeFor(c, m.tee);
+      const absent = m.absent && m.absent[round];
+      el.innerHTML = `
+        <div class="who">
+          <div class="avatar">${esc(initials(m.name))}</div>
+          <div class="grow">
+            <div class="name">${esc(m.name)}</div>
+            <div class="hcp chips num"><span class="chip">HCP <b>${fmtHcp(m.hcp)}</b></span><span class="chip accent">Spiller <b>${ph}</b> ${esc(dayLabel(c).toLowerCase())}</span>${teeNames().length > 1 ? `<span class="chip">Tee <b>${esc(tee.name)}</b></span>` : ""}${absent ? '<span class="chip warn">Spiller ikke</span>' : ""}</div>
+          </div>
+          <button class="btn secondary small" id="btn-edit-me">Ret</button>
+          <button class="btn secondary small" id="btn-switch">Skift</button>
+        </div>`;
+      $("#btn-edit-me").onclick = () => { editingMe = true; render(); };
+      $("#btn-switch").onclick = () => { meId = null; ls.set("golf.me", null); render(); };
+      return;
+    }
+    if (m && editingMe) {
+      el.innerHTML = `
+        <h2>Ret dine oplysninger</h2>
+        <form id="form-edit" class="row" style="align-items:end">
+          <label class="f grow">Navn<input type="text" name="name" value="${esc(m.name)}" required maxlength="60"></label>
+          <label class="f" style="width:110px">HCP-index<input type="text" name="hcp" inputmode="decimal" value="${fmtHcp(m.hcp)}" required></label>
+          ${teeSelect("tee", m.tee)}
+          <div style="flex-basis:100%"></div>
+          ${state.settings.rounds.map((r, i) => `<label class="check"><input type="checkbox" name="absent${i}" ${m.absent && m.absent[i] ? "checked" : ""}> Spiller ikke ${esc(dayLabel(r).toLowerCase())}</label>`).join("")}
+          <div style="flex-basis:100%"></div>
+          <button class="btn" type="submit">Gem</button>
+          <button class="btn secondary" type="button" id="btn-cancel-edit">Annullér</button>
+        </form>`;
+      $("#btn-cancel-edit").onclick = () => { editingMe = false; render(); };
+      $("#form-edit").onsubmit = (ev) => {
+        ev.preventDefault();
+        const f = ev.target;
+        const hcp = parseNum(f.hcp.value);
+        if (isNaN(hcp)) return toast("Skriv dit HCP-index, fx 12,4");
+        const absent = [0, 1, 2].map((i) => f["absent" + i].checked);
+        const tee = f.tee ? f.tee.value : (m.tee || "");
+        guarded(async () => { await api.updatePlayer(m.id, { name: f.name.value.trim(), hcp, absent, tee }); editingMe = false; });
+      };
+      return;
+    }
+    // Ikke valgt: vælg dig selv eller tilmeld dig
+    const opts = state.players.slice().sort((a, b) => a.name.localeCompare(b.name, "da"))
+      .map((p) => `<option value="${p.id}">${esc(p.name)} (${fmtHcp(p.hcp)})</option>`).join("");
+    el.innerHTML = `
+      <span class="eyebrow">Hvem er du?</span>
+      ${state.players.length ? `
+      <div class="row" style="margin-top:8px">
+        <select id="sel-me" class="grow"><option value="">Vælg dit navn …</option>${opts}</select>
+      </div>
+      <p class="muted" style="margin:10px 0 4px">… eller tilmeld dig som ny spiller:</p>` : `<p class="muted">Ingen er tilmeldt endnu. Vær den første:</p>`}
+      <form id="form-join" class="row" style="align-items:end">
+        <label class="f grow">Navn<input type="text" name="name" required maxlength="60" autocomplete="name" placeholder="Fornavn Efternavn"></label>
+        <label class="f" style="width:110px">HCP-index<input type="text" name="hcp" inputmode="decimal" required placeholder="12,4"></label>
+        ${teeSelect("tee", "")}
+        <button class="btn" type="submit">Tilmeld</button>
+      </form>
+      <p class="muted" style="font-size:13px">Dit DGU-handicap omregnes til spillehandicap efter banens course rating og slope, præcis som klubbens konverteringstabel.</p>`;
+    const sel = $("#sel-me");
+    if (sel) sel.onchange = () => { if (sel.value) { meId = sel.value; ls.set("golf.me", meId); render(); } };
+    $("#form-join").onsubmit = (ev) => {
+      ev.preventDefault();
+      const f = ev.target;
+      const hcp = parseNum(f.hcp.value);
+      if (isNaN(hcp)) return toast("Skriv dit HCP-index, fx 12,4");
+      guarded(async () => {
+        const res = await api.addPlayer({ name: f.name.value.trim(), hcp, tee: f.tee ? f.tee.value : "" });
+        meId = res.player.id; ls.set("golf.me", meId);
+      });
+    };
+  }
+
+  function renderScore() {
+    const el = $("#view-score");
+    const m = me();
+    const c = courseOf(round);
+    if (!m) { el.innerHTML = `<div class="card empty">Vælg dit navn eller tilmeld dig ovenfor for at taste din score.</div>`; return; }
+    if (m.absent && m.absent[round]) { el.innerHTML = `<div class="card empty">Du er sat til ikke at spille ${esc(dayLabel(c).toLowerCase())}. Tryk <b>Ret</b> ovenfor for at ændre det.</div>`; return; }
+    const card = S.scorecard(m, c, scoresOf(round)[m.id], state.settings.allowance);
+    const lengths = teeLengths(c, m.tee);
+    const st = standings(round);
+    const myRow = st.rows.find((r) => r.id === m.id);
+    const nextHole = card.holes.find((h) => h.strokes == null);
+    const totalPar = c.par.reduce((a, b) => a + b, 0);
+    const parts = [];
+    parts.push(`<div class="card" style="display:grid;gap:12px">
+      <div class="row">
+        <div class="grow"><h2>${esc(dayLabel(c))} ${esc(fmtDate(c.date))}</h2>
+          <div class="muted num">${esc(c.course || "Bane ikke angivet")} · par ${totalPar} · ${esc(fmtTee(c, m.tee))}</div></div>
+        ${c.closed ? `<span class="status">Runden er lukket</span>` : nextHole ? "" : `<span class="status">Runden er færdig</span>`}
+      </div>
+      <div class="board num">
+        <div><div class="v">${card.total}</div><div class="k">Point</div></div>
+        <div><div class="v plain">${nextHole ? fmtSigned(nextHole.received) : card.playingHcp}</div><div class="k">${nextHole ? "Ekstra slag<br>hul " + nextHole.hole : "Slag i alt"}</div></div>
+        <div><div class="v plain">${card.played === 18 ? "F" : card.played}</div><div class="k">Huller</div></div>
+        <div><div class="v ${myRow && myRow.rank === 1 && card.played ? "" : "plain"}">${myRow ? myRow.rank + "." : "–"}</div><div class="k">Placering</div></div>
+      </div>
+      <div class="holes">
+        <div class="subtotal"><span>Hul · par · nøgle · længde</span><span>Slag</span><span>Point</span></div>
+        ${card.holes.slice(0, 9).map((h, i) => holeRow(h, nextHole && h.hole === nextHole.hole, c.closed, lengths ? lengths[i] : null)).join("")}
+        <div class="subtotal"><span>Ud</span><span>${card.holes.slice(0, 9).reduce((s, h) => s + (h.strokes || 0), 0) || ""}</span><span>${card.front}</span></div>
+        ${card.holes.slice(9).map((h, i) => holeRow(h, nextHole && h.hole === nextHole.hole, c.closed, lengths ? lengths[i + 9] : null)).join("")}
+        <div class="subtotal"><span>Ind</span><span>${card.holes.slice(9).reduce((s, h) => s + (h.strokes || 0), 0) || ""}</span><span>${card.back}</span></div>
+        <div class="subtotal sum num"><span>Ud ${card.front} · Ind ${card.back} · spillehandicap ${card.playingHcp}</span><span class="big">${card.holes.reduce((s, h) => s + (h.strokes || 0), 0) || ""}</span><span class="big">${card.total}</span></div>
+      </div>
+    </div>`);
+    el.innerHTML = parts.join("");
+    el.querySelectorAll(".hole").forEach((b) => (b.onclick = () => { if (!c.closed) openSheet(+b.dataset.hole); }));
+  }
+
+  const teeLengths = (course, teeName) => { const t = S.teeFor(course, teeName); return t.lengths && t.lengths.length === 18 ? t.lengths : null; };
+  function holeRow(h, isNext, closed, length) {
+    const dots = h.received > 0 ? `<span class="dots">+${h.received} slag</span>` : h.received < 0 ? `<span class="dots minus">−${-h.received} slag</span>` : "";
+    const strokesTxt = h.strokes == null ? "·" : h.strokes === 0 ? "streg" : h.strokes;
+    const ptsCls = h.points == null ? "none" : h.points === 0 ? "p0" : h.points >= 5 ? "p5" : h.points === 4 ? "p4" : h.points === 3 ? "p3" : h.points === 1 ? "p1" : "";
+    return `<button class="hole${isNext ? " next" : ""}" data-hole="${h.hole}" ${closed ? "disabled" : ""}>
+      <span class="h num">${h.hole}</span>
+      <span class="meta"><b>Par ${h.par}</b> · nøgle ${h.si}<span class="l2">${length ? length + " m" : ""}${dots}</span></span>
+      <span class="strokes num ${h.strokes == null ? "empty" : h.strokes === 0 ? "streg" : ""}">${strokesTxt}</span>
+      <span class="pts num ${ptsCls}">${h.points == null ? "" : h.points}</span>
+    </button>`;
+  }
+
+  function renderBoard() {
+    const el = $("#view-board");
+    const c = courseOf(round);
+    const st = standings(round);
+    const m = me();
+    const parts = [];
+    if (st.complete) {
+      const w = st.winner;
+      parts.push(`<div class="winner">
+        <div class="trophy">🏆</div>
+        <div><h2>Vinder ${esc(dayLabel(c).toLowerCase())}</h2>
+          <div class="who">${esc(w.name)}</div>
+          <div class="muted num">${w.total} Stablefordpoint · ${w.tournamentPoints} turneringspoint (${st.participants} deltagere + 2)</div></div>
+      </div>`);
+    } else if (st.rows.length) {
+      const done = st.rows.filter((r) => r.played === 18).length;
+      parts.push(`<div class="status live">Runden er i gang: ${done} af ${st.rows.length} spillere er færdige. Vinderen og turneringspointene vises, når alle er i hus.</div>`);
+    }
+    if (!st.rows.length) {
+      parts.push(`<div class="card empty">Ingen spillere på denne runde endnu.</div>`);
+    } else {
+      parts.push(`<div class="card"><div class="tbl-wrap"><table>
+        <thead><tr><th></th><th></th><th>Spiller</th><th class="c">Huller</th><th class="r">Point</th>${st.complete ? '<th class="r">Turn.</th>' : ""}</tr></thead>
+        <tbody>${st.rows.map((r) => `<tr class="${m && r.id === m.id ? "me" : ""}${r.rank === 1 && r.played ? " lead" : ""}">
+          <td class="rank num">${r.rank}</td>
+          <td><span class="move num ${r.move > 0 ? "up" : r.move < 0 ? "down" : "same"}">${r.move > 0 ? "▲" + r.move : r.move < 0 ? "▼" + -r.move : "–"}</span></td>
+          <td class="name"><div class="pname">${esc(r.name)}</div><div class="psub num">HCP ${fmtHcp(r.hcp)} · spiller ${r.playingHcp}${teeNames().length > 1 ? " (tee " + esc(r.tee) + ")" : ""}${r.played ? " · for " + r.front + " / bag " + r.back : ""}</div></td>
+          <td class="c num"><span class="thru ${r.played === 18 ? "f" : ""}">${r.played === 18 ? "F" : r.played}</span></td>
+          <td class="r big num">${r.total}</td>
+          ${st.complete ? `<td class="r"><span class="tp ${r.rank === 1 ? "win" : ""}">${r.tournamentPoints}</span></td>` : ""}
+        </tr>`).join("")}</tbody></table></div>
+        <p class="muted" style="font-size:13px;margin-top:10px">Ved lige Stablefordpoint står den med laveste HCP-index øverst. Turneringspoint: vinderen får antal deltagere + 2, nr. 2 får antal deltagere − 1, og så fremdeles ned til 1 point.</p>
+      </div>`);
+    }
+    el.innerHTML = parts.join("");
+  }
+
+  function renderOverall() {
+    const el = $("#view-overall");
+    const results = [0, 1, 2].map((i) => standings(i));
+    const rows = S.overallStandings(state.players, results);
+    const m = me();
+    const doneCount = results.filter((r) => r.complete).length;
+    const leader = rows[0];
+    const parts = [];
+    if (doneCount === 3 && leader) {
+      parts.push(`<div class="winner"><div class="trophy">🏆</div><div><h2>Samlet vinder</h2><div class="who">${esc(leader.name)}</div><div class="muted num">${leader.points} turneringspoint · ${leader.stableford} Stablefordpoint i alt</div></div></div>`);
+    } else {
+      parts.push(`<div class="status">${doneCount} af 3 runder er færdige. Turneringspoint tildeles, når en runde er færdigspillet.</div>`);
+    }
+    if (!rows.length) parts.push(`<div class="card empty">Ingen spillere tilmeldt endnu.</div>`);
+    else parts.push(`<div class="card"><div class="tbl-wrap"><table>
+      <thead><tr><th></th><th>Spiller</th>${state.settings.rounds.map((r) => `<th class="c">${esc(dayLabel(r).slice(0, 3))}</th>`).join("")}<th class="r">Point</th><th class="r">Stbf.</th></tr></thead>
+      <tbody>${rows.map((r) => `<tr class="${m && r.id === m.id ? "me" : ""}${r.rank === 1 && r.points ? " lead" : ""}">
+        <td class="rank num">${r.rank}</td>
+        <td class="name"><div class="pname">${esc(r.name)}</div><div class="psub num">HCP ${fmtHcp(r.hcp)}</div></td>
+        ${r.perRound.map((pr, i) => `<td class="c num">${pr.points != null ? `<span class="tp ${pr.rank === 1 ? "win" : ""}" title="${pr.stableford} Stablefordpoint">${pr.points}</span>` : pr.played ? `<span class="muted">${pr.stableford}<small> p</small></span>` : `<span class="muted">–</span>`}</td>`).join("")}
+        <td class="r big num">${r.points}</td>
+        <td class="r num muted">${r.stableford}</td>
+      </tr>`).join("")}</tbody></table></div>
+      <p class="muted" style="font-size:13px;margin-top:10px">Samlet stilling efter turneringspoint. Grå tal i rundekolonnerne er Stablefordpoint for runder, der stadig er i gang. Ved lighed tæller flest Stablefordpoint i alt, derefter laveste HCP-index.</p>
+    </div>`);
+    el.innerHTML = parts.join("");
+  }
+
+  // ---------- banen ----------
+  function renderCourse() {
+    const el = $("#view-course");
+    const c = courseOf(round);
+    const tees = (c.tees || []).filter((t) => t.lengths && t.lengths.length === 18);
+    const totalPar = c.par.reduce((a, b) => a + b, 0);
+    const sum = (arr, from, to) => arr.slice(from, to).reduce((a, b) => a + b, 0);
+    const row = (i) => `<tr><td class="rank num">${i + 1}</td><td class="c num">${c.par[i]}</td><td class="c num">${c.si[i]}</td>${tees.map((t) => `<td class="r num">${t.lengths[i]}</td>`).join("")}</tr>`;
+    const sumRow = (label, from, to) => `<tr><td><b>${label}</b></td><td class="c num"><b>${sum(c.par, from, to)}</b></td><td></td>${tees.map((t) => `<td class="r num"><b>${sum(t.lengths, from, to)}</b></td>`).join("")}</tr>`;
+    const rules = (state.settings.rules || "").split("\n").map((l) => l.trim()).filter(Boolean)
+      .map((l) => l.startsWith("## ") ? `<h3>${esc(l.slice(3))}</h3>` : `<p class="${/^\d+\./.test(l) ? "n" : ""}">${esc(l)}</p>`).join("");
+    el.innerHTML = `
+      <div class="card">
+        <h2>${esc(c.course || "Banen")}</h2>
+        <div class="muted num">Par ${totalPar} · ${(c.tees || []).map((t) => "tee " + esc(t.name) + ": CR " + String(t.cr).replace(".", ",") + " / slope " + t.slope).join(" · ")}</div>
+        <div class="tbl-wrap" style="margin-top:10px"><table>
+          <thead><tr><th>Hul</th><th class="c">Par</th><th class="c">Nøgle</th>${tees.map((t) => `<th class="r">Tee ${esc(t.name)}</th>`).join("")}</tr></thead>
+          <tbody>${Array.from({ length: 9 }, (_, i) => row(i)).join("")}${sumRow("Ud", 0, 9)}${Array.from({ length: 9 }, (_, i) => row(i + 9)).join("")}${sumRow("Ind", 9, 18)}${sumRow("I alt", 0, 18)}</tbody>
+        </table></div>
+        ${tees.length ? '<p class="muted" style="font-size:13px">Længder i meter fra klubbens baneguide.</p>' : ""}
+      </div>
+      ${rules ? `<div class="card rules">${rules}</div>` : ""}`;
+  }
+
+  // ---------- opsætning ----------
+  function renderSettings() {
+    const el = $("#view-settings");
+    if (!settingsDraft) settingsDraft = JSON.parse(JSON.stringify(state.settings));
+    const d = settingsDraft;
+    const pinRequired = state.pinRequired;
+    el.innerHTML = `
+      <div class="card" style="display:grid;gap:14px">
+        <div class="row"><h2 class="grow">Opsætning</h2><button class="btn secondary small" id="btn-back">‹ Tilbage</button></div>
+        ${pinRequired ? `<label class="f">PIN (kræves for at gemme opsætning, lukke runder og slette spillere)<input type="password" id="pin" value="${esc(ls.get("golf.pin", ""))}" autocomplete="off"></label>` : ""}
+        <label class="f">Turneringens navn<input type="text" id="s-name" value="${esc(d.name)}" maxlength="60"></label>
+        <label class="f">Handicaptildeling (DGU anbefaler 95 % til individuel Stableford; mange private turneringer bruger 100 %)
+          <select id="s-allowance"><option value="100" ${d.allowance === 100 ? "selected" : ""}>100 %</option><option value="95" ${d.allowance === 95 ? "selected" : ""}>95 %</option><option value="90" ${d.allowance === 90 ? "selected" : ""}>90 %</option></select></label>
+        <label class="f">Lokalregler og ordensregler (vises under fanen Banen; en linje, der begynder med ##, bliver en overskrift)<textarea id="s-rules" rows="7">${esc(d.rules || "")}</textarea></label>
+        ${d.rounds.map((r, i) => `<div class="round-set">
+          <div class="row"><b class="grow">Runde ${i + 1}</b>
+            ${i === 0 ? `<button class="btn secondary small" id="btn-copy">Kopiér bane til alle runder</button>` : ""}
+            <button class="btn ${r.closed ? "secondary" : "danger"} small" data-close="${i}">${r.closed ? "Genåbn runden" : "Luk runden nu"}</button>
+          </div>
+          <div class="two">
+            <label class="f">Dato<input type="date" data-r="${i}" data-k="date" value="${esc(r.date)}"></label>
+            <label class="f">Bane<input type="text" data-r="${i}" data-k="course" value="${esc(r.course)}" placeholder="fx Rungsted Golf Klub"></label>
+          </div>
+          <div class="eyebrow">Tees (course rating og slope fra klubbens konverteringstabel) · par i alt ${r.par.reduce((a, b) => a + b, 0)}</div>
+          ${r.tees.map((t, k) => `<div class="four">
+            <label class="f">Tee<input type="text" data-r="${i}" data-tee="${k}" data-k="name" value="${esc(t.name)}" placeholder="fx 56"></label>
+            <label class="f">Course rating<input type="text" inputmode="decimal" data-r="${i}" data-tee="${k}" data-k="cr" value="${String(t.cr).replace(".", ",")}"></label>
+            <label class="f">Slope<input type="number" data-r="${i}" data-tee="${k}" data-k="slope" value="${t.slope}" min="55" max="155"></label>
+            <label class="f">&nbsp;<button class="btn secondary small" type="button" data-deltee="${i}:${k}" ${r.tees.length < 2 ? "disabled" : ""}>Fjern tee</button></label>
+          </div>
+          <details><summary class="muted" style="font-size:13px">Længder pr. hul for tee ${esc(t.name)} (meter, valgfrit)</summary>
+            <div class="grid18">${Array.from({ length: 18 }, (_, h) => `<div><div class="lab">${h + 1}</div><input type="number" min="0" max="999" data-r="${i}" data-tee="${k}" data-len="${h}" value="${t.lengths && t.lengths.length === 18 ? t.lengths[h] : ""}"></div>`).join("")}</div>
+          </details>`).join("")}
+          <div><button class="btn secondary small" type="button" data-addtee="${i}">+ Tilføj tee (fx 49 til damer)</button></div>
+          <div class="eyebrow">Par pr. hul</div>
+          <div class="grid18">${r.par.map((p, h) => `<div><div class="lab">${h + 1}</div><input type="number" min="3" max="6" data-r="${i}" data-arr="par" data-h="${h}" value="${p}"></div>`).join("")}</div>
+          <div class="eyebrow">Handicapnøgle pr. hul (1–18)</div>
+          <div class="grid18">${r.si.map((p, h) => `<div><div class="lab">${h + 1}</div><input type="number" min="1" max="18" data-r="${i}" data-arr="si" data-h="${h}" value="${p}"></div>`).join("")}</div>
+        </div>`).join("")}
+        <div class="row"><button class="btn" id="btn-save-settings">Gem opsætning</button><button class="btn secondary" id="btn-discard">Fortryd ændringer</button></div>
+        <details>
+          <summary>Spillere (${state.players.length})</summary>
+          <div class="plist">${state.players.map((p) => `<div><span class="grow">${esc(p.name)} <span class="muted num">HCP ${fmtHcp(p.hcp)}</span></span><button class="btn danger small" data-del="${p.id}">Slet</button></div>`).join("") || '<p class="muted">Ingen tilmeldt.</p>'}</div>
+        </details>
+        <details>
+          <summary>Nulstil turneringen</summary>
+          <p class="muted">Sletter alle spillere og scorer, men beholder baneopsætningen.</p>
+          <button class="btn danger" id="btn-reset">Slet alle spillere og scorer</button>
+        </details>
+        <p class="muted" style="font-size:13px">Spillehandicap = HCP-index × slope ÷ 113 + (course rating − par), ganget med handicaptildelingen og rundet til hele slag. Med 100 % giver det samme tal som klubbens konverteringstabel. Slagene fordeles efter handicapnøglen. Spillere vælger selv tee ved tilmelding, når der er mere end ét.</p>
+      </div>`;
+
+    const bind = (inp) => {
+      const i = +inp.dataset.r;
+      if (inp.dataset.arr) { d.rounds[i][inp.dataset.arr][+inp.dataset.h] = parseInt(inp.value, 10) || 0; }
+      else if (inp.dataset.tee != null) {
+        const t = d.rounds[i].tees[+inp.dataset.tee];
+        if (inp.dataset.len != null) {
+          if (!t.lengths || t.lengths.length !== 18) t.lengths = Array(18).fill(0);
+          t.lengths[+inp.dataset.len] = parseInt(inp.value, 10) || 0;
+          if (t.lengths.every((x) => !x)) t.lengths = null;
+        }
+        else if (inp.dataset.k === "cr") t.cr = parseNum(inp.value);
+        else if (inp.dataset.k === "slope") t.slope = parseInt(inp.value, 10) || 113;
+        else {
+          t.name = inp.value;
+          // Samsø: længderne kendes for tee 49, 56 og 61
+          const known = /samsø/i.test(d.rounds[i].course) && SAMSOE.lengths[t.name.trim()];
+          if (known && !(t.lengths && t.lengths.some((x) => x))) t.lengths = known.slice();
+        }
+      }
+      else d.rounds[i][inp.dataset.k] = inp.value;
+      d.rounds[i].label = dayLabel(d.rounds[i]);
+    };
+    el.querySelectorAll("[data-addtee]").forEach((b) => (b.onclick = () => { d.rounds[+b.dataset.addtee].tees.push({ name: "", cr: 72, slope: 113 }); render(); }));
+    el.querySelectorAll("[data-deltee]").forEach((b) => (b.onclick = () => { const [i, k] = b.dataset.deltee.split(":").map(Number); d.rounds[i].tees.splice(k, 1); render(); }));
+    el.querySelectorAll("input[data-r]").forEach((inp) => (inp.oninput = () => bind(inp)));
+    el.querySelectorAll("input[data-tee][data-k=name]").forEach((inp) => (inp.onchange = () => render()));
+    $("#s-rules").oninput = (e) => (d.rules = e.target.value);
+    $("#s-name").oninput = (e) => (d.name = e.target.value);
+    $("#s-allowance").onchange = (e) => (d.allowance = parseInt(e.target.value, 10));
+    const pin = $("#pin"); if (pin) pin.oninput = () => ls.set("golf.pin", pin.value);
+    $("#btn-back").onclick = () => { view = "score"; render(); };
+    $("#btn-discard").onclick = () => { settingsDraft = null; render(); };
+    $("#btn-copy").onclick = () => {
+      for (let i = 1; i < ROUND_COUNT; i++) {
+        const r0 = d.rounds[0];
+        Object.assign(d.rounds[i], { course: r0.course, tees: r0.tees.map((t) => ({ ...t })), par: r0.par.slice(), si: r0.si.slice() });
+      }
+      render(); toast("Banen er kopieret til alle tre runder. Husk at gemme.");
+    };
+    $("#btn-save-settings").onclick = () => {
+      for (const r of d.rounds) {
+        if (r.par.some((p) => p < 3 || p > 6)) return toast("Par skal være 3–6 på alle huller");
+        if (r.si.slice().sort((a, b) => a - b).join() !== Array.from({ length: 18 }, (_, k) => k + 1).join()) return toast("Handicapnøglerne skal være tallene 1–18, hver brugt én gang");
+        if (!r.tees.length) return toast("Hver runde skal have mindst ét tee");
+        for (const t of r.tees) {
+          if (!t.name.trim()) return toast("Giv hvert tee et navn, fx 56");
+          if (!(t.cr >= 40 && t.cr <= 90)) return toast("Course rating for tee " + t.name + " ser forkert ud");
+          if (!(t.slope >= 55 && t.slope <= 155)) return toast("Slope for tee " + t.name + " ser forkert ud");
+          if (t.lengths && (t.lengths.length !== 18 || t.lengths.some((x) => x < 0 || x > 999))) return toast("Længderne for tee " + t.name + " skal være 18 tal i meter");
+        }
+      }
+      guarded(async () => { await api.saveSettings(d); settingsDraft = null; toast("Opsætningen er gemt"); });
+    };
+    el.querySelectorAll("[data-close]").forEach((b) => (b.onclick = () => {
+      const i = +b.dataset.close; const closing = !state.settings.rounds[i].closed;
+      if (closing && !confirm("Luk runden nu? Spillere uden score udgår, og vinderen findes blandt dem, der har tastet. Ingen kan taste mere på runden.")) return;
+      guarded(async () => { await api.setClosed(i, closing); settingsDraft = null; });
+    }));
+    el.querySelectorAll("[data-del]").forEach((b) => (b.onclick = () => {
+      const p = state.players.find((x) => x.id === b.dataset.del);
+      if (!confirm(`Slet ${p.name} og alle spillerens scorer?`)) return;
+      guarded(async () => { await api.deletePlayer(p.id); if (meId === p.id) { meId = null; ls.set("golf.me", null); } });
+    }));
+    $("#btn-reset").onclick = () => {
+      if (!confirm("Slet ALLE spillere og scorer? Det kan ikke fortrydes.")) return;
+      guarded(async () => { await api.reset(); meId = null; ls.set("golf.me", null); settingsDraft = null; });
+    };
+  }
+
+  // ---------- numpad ----------
+  function openSheet(hole) {
+    sheetHole = hole; renderSheet();
+    $("#sheet").classList.add("open"); $("#sheet-bg").classList.add("open");
+  }
+  function closeSheet() {
+    sheetHole = null;
+    $("#sheet").classList.remove("open"); $("#sheet-bg").classList.remove("open");
+  }
+  function renderSheet() {
+    const m = me(); if (!m || !sheetHole) return closeSheet();
+    const c = courseOf(round);
+    const card = S.scorecard(m, c, scoresOf(round)[m.id], state.settings.allowance);
+    const h = card.holes[sheetHole - 1];
+    $("#sheet-title").innerHTML = "Hul " + h.hole + "<small>Par " + h.par + "</small>";
+    $("#sheet-side").textContent = card.total + " p · " + card.played + "/18";
+    const recv = h.received === 0 ? "ingen ekstra slag" : h.received === 1 ? "du får 1 slag" : h.received > 0 ? "du får " + h.received + " slag" : "du afgiver " + -h.received + " slag";
+    const lens = teeLengths(c, m.tee);
+    $("#sheet-info").innerHTML = (lens ? lens[h.hole - 1] + " m · " : "") + "nøgle " + h.si + " · <b>" + esc(recv) + "</b> · netpar " + (h.par + h.received) + (h.strokes != null ? " · nu: " + (h.strokes === 0 ? "streg" : h.strokes + " slag = " + h.points + " point") : "");
+    const pad = $("#pad");
+    let html = "";
+    for (let n = 1; n <= 12; n++) {
+      const p = S.stablefordPoints(n, h.par, h.received);
+      html += `<button data-n="${n}" class="num ${n === h.par ? "par" : ""} ${h.strokes === n ? "cur" : ""}" aria-label="${n} slag, ${p} point">${n}<small>${p} p</small></button>`;
+    }
+    html += `<button data-n="0" class="streg ${h.strokes === 0 ? "cur" : ""}">Streg</button><button data-n="null" class="ryd">Ryd</button>`;
+    pad.innerHTML = html;
+    pad.querySelectorAll("button").forEach((b) => (b.onclick = () => {
+      const v = b.dataset.n === "null" ? null : parseInt(b.dataset.n, 10);
+      const hole = sheetHole;
+      guarded(async () => {
+        await api.setScore(round, m.id, hole, v);
+        if (v != null && hole < 18) sheetHole = hole + 1; else closeSheet();
+      });
+    }));
+    $("#sheet-prev").disabled = h.hole === 1;
+    $("#sheet-next").disabled = h.hole === 18;
+  }
+  $("#sheet-prev").onclick = () => { if (sheetHole > 1) { sheetHole--; renderSheet(); } };
+  $("#sheet-next").onclick = () => { if (sheetHole < 18) { sheetHole++; renderSheet(); } };
+  $("#sheet-close").onclick = closeSheet;
+  $("#sheet-bg").onclick = closeSheet;
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && sheetHole) closeSheet(); });
+
+  // ---------- navigation ----------
+  $("#rounds").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-round]"); if (!b) return;
+    round = +b.dataset.round; if (view === "settings") view = "score"; render();
+  });
+  $("#views").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-view]"); if (!b) return;
+    view = b.dataset.view; render();
+  });
+  $("#btn-settings").onclick = () => { view = view === "settings" ? "score" : "settings"; render(); };
+
+  // ---------- hentning ----------
+  let refreshing = null;
+  function refresh(force) {
+    // Kører aldrig to hentninger samtidig; en tvungen hentning venter på den igangværende
+    if (refreshing) return refreshing.then(() => (force ? refresh(true) : undefined));
+    refreshing = (async () => {
+      try {
+        const res = await api.state(force ? 0 : (state ? state.version : 0));
+        if (!res.unchanged) {
+          const first = !state;
+          state = res;
+          if (first) round = defaultRound();
+          render();
+        }
+      } catch (e) {
+        if (!state) $("#me-card").innerHTML = `<div class="empty">Kunne ikke hente turneringen: ${esc(e.message)}</div>`;
+      } finally { refreshing = null; }
+    })();
+    return refreshing;
+  }
+
+  async function start() {
+    try {
+      const r = await fetch("api/state", { cache: "no-store" });
+      if (r.ok) api = restApi();
+    } catch (e) { /* ingen server */ }
+    if (!api) { api = localApi(); $("#demo-note").classList.remove("hidden"); }
+    await refresh(true);
+    setInterval(() => { if (document.visibilityState === "visible") refresh(false); }, api.demo ? 3000 : 4000);
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") refresh(false); });
+  }
+  start();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+# Golfturnering. HTTPS og adresse styres af den fælles Caddy fra repoet server-proxy (netværket "web").
+# Kopiér .env.example til .env, og start med:  docker compose up -d --build
+services:
+  golf:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - golf_data:/data
+    networks:
+      default:
+      web:
+        aliases:
+          - golf
+
+networks:
+  web:
+    external: true
+
+volumes:
+  golf_data:

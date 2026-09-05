@@ -1,0 +1,7 @@
+.git
+.venv
+golf/data
+tests
+*.bat
+__pycache__
+.pytest_cache
