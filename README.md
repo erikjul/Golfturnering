@@ -23,8 +23,11 @@ Alle, der har adressen, kan åbne den på telefonen, tilmelde sig og taste slag 
   manuelt under Opsætning). Så vises rundens vinder og ranglistepointene: vinderen får *antal
   deltagere + 2*, nr. 2 får *antal deltagere − 1*, og så videre ned til 1 point til sidstepladsen.
   Med 18 deltagere får vinderen altså 20, nr. 2 får 17, nr. 3 får 16 og nr. 18 får 1.
-* **Samlet:** ranglistepoint lagt sammen over de tre runder; 0 for runder, man ikke deltog i. Ved
-  lighed tæller flest Stablefordpoint i alt, derefter laveste HCP-index.
+* **Samlet (ranglisten):** hver spiller har de ranglistepoint med, som var optjent før turneringen
+  (kolonnen *Før*, stillingen efter Horsens 15/8). Rundernes ranglistepoint lægges til, efterhånden
+  som runderne bliver færdige, og listen sorteres med flest point øverst. 0 for runder, man ikke
+  deltog i. Ved lighed tæller flest Stablefordpoint på Samsø, derefter laveste HCP-index. De medbragte
+  point kan rettes under Opsætning med PIN.
 * **Banen:** huloversigt med par, handicapnøgle og længder pr. tee samt klubbens lokalregler og
   ordensregler (teksten kan rettes under Opsætning).
 * **Opsætning (tandhjulet):** turneringens navn, bane, ét eller flere tees med course rating og

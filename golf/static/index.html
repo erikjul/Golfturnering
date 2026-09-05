@@ -377,11 +377,11 @@ details summary { cursor: pointer; font-weight: 600; padding: 6px 0; }
       "56": [320, 350, 445, 140, 345, 320, 320, 150, 435, 435, 130, 325, 330, 435, 145, 345, 360, 285],
       "61": [336, 380, 485, 173, 345, 346, 320, 172, 438, 452, 149, 359, 330, 512, 172, 416, 370, 340],
     },
-    players: [["Claus Ladevig", "27-4183", 17.3], ["Lars Tørslev", "27-498", 10.0], ["Henrik Sørensen", "27-47", 22.4], ["Søren Palmelund", "27-4666", 10.8],
-      ["Lars Scheuer", "95-20200053", 16.4], ["Dennis Nymark", "89-4100", 5.9], ["Erik Jul Nielsen", "95-20180097", 17.5], ["Michael Søndergaard", "27-4809", 31.9],
-      ["Tony Juul Andersen", "184-2033", 17.8], ["Finn Maach", "27-6353", 22.3], ["Christian Alsing", "44-1097", 8.3], ["Henrik Jensen", "96-5504", 36.9],
-      ["Jess Bæk", "117-1047", 11.6], ["Claus Krøyer", "95-20190302", 26.4], ["Lars Feldskou", "95-20200434", 21.0], ["Henrik Laursen", "153-215", 25.4],
-      ["Rico Soos", "95-25186", 14.4], ["Jon Jarlgaard", "27-4560", 20.2], ["Thomas Pedersen", "86-161", 5.4], ["Kalle Nielsen", "27-2016", 22.3]],
+    players: [["Claus Ladevig", "27-4183", 17.3, 64], ["Lars Tørslev", "27-498", 10.0, 59], ["Henrik Sørensen", "27-47", 22.4, 55], ["Søren Palmelund", "27-4666", 10.8, 51],
+      ["Lars Scheuer", "95-20200053", 16.4, 51], ["Dennis Nymark", "89-4100", 5.9, 49], ["Erik Jul Nielsen", "95-20180097", 17.5, 46], ["Michael Søndergaard", "27-4809", 31.9, 43],
+      ["Tony Juul Andersen", "184-2033", 17.8, 41], ["Finn Maach", "27-6353", 22.3, 36], ["Christian Alsing", "44-1097", 8.3, 31], ["Henrik Jensen", "96-5504", 36.9, 23],
+      ["Jess Bæk", "117-1047", 11.6, 23], ["Claus Krøyer", "95-20190302", 26.4, 17], ["Lars Feldskou", "95-20200434", 21.0, 16], ["Henrik Laursen", "153-215", 25.4, 15],
+      ["Rico Soos", "95-25186", 14.4, 13], ["Jon Jarlgaard", "27-4560", 20.2, 13], ["Thomas Pedersen", "86-161", 5.4, 10], ["Kalle Nielsen", "27-2016", 22.3, 6]],
     rules: `## Lokalregler (Samsø Golfklub)
 Banemarkeringer: hvide = out of bounds, røde = strafområde, blå = areal under reparation, grøn top = spilleforbud.
 1. Out of bounds defineres som linjen mellem de banenære punkter af hvide pæle i jordhøjde.
@@ -424,6 +424,7 @@ Drikkevand foran hul 1 og 10. Toiletter ved hul 10 og 13. Hjertestarter ved klub
       deletePlayer: (id) => call("DELETE", "api/players/" + id),
       confirm: (id, r, body) => call("PUT", `api/players/${id}/confirm/${r}`, body),
       unconfirm: (id, r) => call("DELETE", `api/players/${id}/confirm/${r}`),
+      setCarry: (id, carry) => call("PUT", `api/players/${id}/carry`, { carry }),
       setScore: (r, pid, hole, strokes) => call("PUT", `api/scores/${r}/${pid}/${hole}`, { strokes }),
       saveSettings: (s) => call("PUT", "api/settings", s),
       setClosed: (r, v) => call("POST", `api/rounds/${r}/closed?value=${v ? 1 : 0}`),
@@ -443,11 +444,11 @@ Drikkevand foran hul 1 og 10. Toiletter ved hul 10 og 13. Hjertestarter ved klub
             date, label, course: "Samsø Golfklub", tees: [{ name: "56", cr: 70.8, slope: 131, lengths: SAMSOE.lengths["56"].slice() }, { name: "49", cr: 66.9, slope: 122, lengths: SAMSOE.lengths["49"].slice() }], par: PAR.slice(), si: SI.slice(), closed: false,
           })),
         },
-        players: SAMSOE.players.map(([name, dgu, hcp]) => newPlayer(name, hcp, dgu, "")), scores: { 0: {}, 1: {}, 2: {} },
+        players: SAMSOE.players.map(([name, dgu, hcp, carry]) => newPlayer(name, hcp, dgu, "", carry)), scores: { 0: {}, 1: {}, 2: {} },
       };
     }
-    function newPlayer(name, hcp, dgu, tee) {
-      return { id: "p" + Math.random().toString(16).slice(2, 10), name, dgu: dgu || "", hcp, hcpByRound: {}, tee: tee || "", created: Date.now() / 1000 };
+    function newPlayer(name, hcp, dgu, tee, carry) {
+      return { id: "p" + Math.random().toString(16).slice(2, 10), name, dgu: dgu || "", hcp, hcpByRound: {}, carry: carry || 0, tee: tee || "", created: Date.now() / 1000 };
     }
     let st = ls.get("golf.demo", null) || fresh();
     const save = () => { st.version++; ls.set("golf.demo", st); };
@@ -468,6 +469,7 @@ Drikkevand foran hul 1 og 10. Toiletter ved hul 10 og 13. Hjertestarter ved klub
         if (st.scores[r][id] && old != null && old !== body.hcp) throw new Error("Handicap kan ikke ændres, når der er tastet scorer på runden");
         x.hcpByRound[r] = body.hcp; x.hcp = body.hcp; if (body.tee != null) x.tee = body.tee; save(); return { player: x };
       },
+      async setCarry(id, carry) { const x = find(id); x.carry = carry; save(); return { player: x }; },
       async unconfirm(id, r) {
         const x = find(id);
         if (st.scores[r][id]) throw new Error("Der er tastet scorer på runden");
@@ -793,21 +795,21 @@ Drikkevand foran hul 1 og 10. Toiletter ved hul 10 og 13. Hjertestarter ved klub
     const leader = rows[0];
     const parts = [];
     if (doneCount === 3 && leader) {
-      parts.push(`<div class="winner"><div class="trophy">🏆</div><div><h2>Samlet vinder</h2><div class="who">${esc(leader.name)}</div><div class="muted num">${leader.points} turneringspoint · ${leader.stableford} Stablefordpoint i alt</div></div></div>`);
+      parts.push(`<div class="winner"><div class="trophy">🏆</div><div><h2>Ranglisten efter Samsø</h2><div class="who">${esc(leader.name)}</div><div class="muted num">${leader.points} ranglistepoint · ${leader.carry} medbragt + ${leader.earned} på Samsø</div></div></div>`);
     } else {
-      parts.push(`<div class="status">${doneCount} af 3 runder er færdige. Turneringspoint tildeles, når en runde er færdigspillet.</div>`);
+      parts.push(`<div class="status">Ranglisten før turneringen plus point fra ${doneCount} af 3 færdige runder. Rundens ranglistepoint lægges til, når runden er færdigspillet.</div>`);
     }
     if (!rows.length) parts.push(`<div class="card empty">Ingen spillere tilmeldt endnu.</div>`);
     else parts.push(`<div class="card"><div class="tbl-wrap"><table>
-      <thead><tr><th></th><th>Spiller</th>${state.settings.rounds.map((r) => `<th class="c">${esc(dayLabel(r).slice(0, 3))}</th>`).join("")}<th class="r">Point</th><th class="r">Stbf.</th></tr></thead>
+      <thead><tr><th></th><th>Spiller</th><th class="r">Før</th>${state.settings.rounds.map((r) => `<th class="c">${esc(dayLabel(r).slice(0, 3))}</th>`).join("")}<th class="r">I alt</th></tr></thead>
       <tbody>${rows.map((r) => `<tr class="${m && r.id === m.id ? "me" : ""}${r.rank === 1 && r.points ? " lead" : ""}">
         <td class="rank num">${r.rank}</td>
-        <td class="name"><div class="pname">${esc(r.name)}</div><div class="psub num">HCP ${fmtHcp(r.hcp)}</div></td>
-        ${r.perRound.map((pr, i) => `<td class="c num">${!pr.participated ? `<span class="muted" title="Deltog ikke">0</span>` : pr.points != null ? `<span class="tp ${pr.rank === 1 ? "win" : ""}" title="${pr.stableford} Stablefordpoint">${pr.points}</span>` : pr.played ? `<span class="muted">${pr.stableford}<small> p</small></span>` : `<span class="muted">–</span>`}</td>`).join("")}
+        <td class="name"><div class="pname">${esc(r.name)}</div><div class="psub num">HCP ${fmtHcp(r.hcp)}${r.stableford ? " · " + r.stableford + " stbf. på Samsø" : ""}</div></td>
+        <td class="r num muted">${r.carry}</td>
+        ${r.perRound.map((pr, i) => `<td class="c num">${!pr.participated ? `<span class="muted" title="Deltog ikke">0</span>` : pr.points != null ? `<span class="tp ${pr.rank === 1 ? "win" : ""}" title="${pr.stableford} Stablefordpoint">${pr.points}</span>` : pr.played ? `<span class="muted" title="Runden er i gang">${pr.stableford}<small> p</small></span>` : `<span class="muted">–</span>`}</td>`).join("")}
         <td class="r big num">${r.points}</td>
-        <td class="r num muted">${r.stableford}</td>
       </tr>`).join("")}</tbody></table></div>
-      <p class="muted" style="font-size:13px;margin-top:10px">Samlet stilling efter ranglistepoint. Grå tal i rundekolonnerne er Stablefordpoint for runder, der stadig er i gang; 0 betyder, at spilleren ikke deltog. Ved lighed tæller flest Stablefordpoint i alt, derefter laveste HCP-index.</p>
+      <p class="muted" style="font-size:13px;margin-top:10px">"Før" er ranglistepoint medbragt fra tidligere runder (stillingen efter Horsens 15/8). Rundekolonnerne viser rundens ranglistepoint, når runden er færdig; grå tal er Stablefordpoint for en runde, der stadig er i gang, og 0 betyder, at spilleren ikke deltog. "I alt" er den løbende rangliste. Ved lighed tæller flest Stablefordpoint på Samsø, derefter laveste HCP-index.</p>
     </div>`);
     el.innerHTML = parts.join("");
   }
@@ -878,8 +880,8 @@ Drikkevand foran hul 1 og 10. Toiletter ved hul 10 og 13. Hjertestarter ved klub
         <div class="row"><button class="btn" id="btn-save-settings">Gem opsætning</button><button class="btn secondary" id="btn-discard">Fortryd ændringer</button></div>
         <details>
           <summary>Deltagerliste (${state.players.length}) · bekræftet ${esc(dayLabel(courseOf(round)).toLowerCase())}: ${state.players.filter((p) => S.hcpForRound(p, round) != null).length}</summary>
-          <p class="muted" style="font-size:13px">"Ret HCP" ændrer det bekræftede indeks for den valgte runde (${esc(dayLabel(courseOf(round)).toLowerCase())}) og kræver PIN, hvis der er tastet scorer. "Fjern" trækker spillerens deltagelse på runden tilbage.</p>
-          <div class="plist">${state.players.slice().sort((a, b) => a.name.localeCompare(b.name, "da")).map((p) => { const h = S.hcpForRound(p, round); return `<div><span class="grow">${esc(p.name)} <span class="muted num">${p.dgu ? esc(p.dgu) + " · " : ""}${h != null ? "HCP " + fmtHcp(h) + " bekræftet" : "ikke bekræftet (senest " + fmtHcp(p.hcp) + ")"}</span></span><button class="btn secondary small" data-hcp="${p.id}">Ret HCP</button>${h != null ? `<button class="btn secondary small" data-unconfirm="${p.id}">Fjern</button>` : ""}<button class="btn danger small" data-del="${p.id}">Slet</button></div>`; }).join("") || '<p class="muted">Ingen på listen.</p>'}</div>
+          <p class="muted" style="font-size:13px">"Ret HCP" ændrer det bekræftede indeks for den valgte runde (${esc(dayLabel(courseOf(round)).toLowerCase())}) og kræver PIN, hvis der er tastet scorer. "Fjern" trækker spillerens deltagelse på runden tilbage. "Før" er medbragte ranglistepoint og kræver PIN at ændre.</p>
+          <div class="plist">${state.players.slice().sort((a, b) => a.name.localeCompare(b.name, "da")).map((p) => { const h = S.hcpForRound(p, round); return `<div><span class="grow">${esc(p.name)} <span class="muted num">${p.dgu ? esc(p.dgu) + " · " : ""}${h != null ? "HCP " + fmtHcp(h) + " bekræftet" : "ikke bekræftet (senest " + fmtHcp(p.hcp) + ")"} · før ${p.carry || 0} p</span></span><button class="btn secondary small" data-hcp="${p.id}">Ret HCP</button><button class="btn secondary small" data-carry="${p.id}">Før</button>${h != null ? `<button class="btn secondary small" data-unconfirm="${p.id}">Fjern</button>` : ""}<button class="btn danger small" data-del="${p.id}">Slet</button></div>`; }).join("") || '<p class="muted">Ingen på listen.</p>'}</div>
         </details>
         <details>
           <summary>Nulstil turneringen</summary>
@@ -960,6 +962,14 @@ Drikkevand foran hul 1 og 10. Toiletter ved hul 10 og 13. Hjertestarter ved klub
       const hcp = parseNum(v);
       if (isNaN(hcp)) return toast("Skriv et tal, fx 12,4");
       guarded(async () => { await api.confirm(p.id, round, { hcp }); });
+    }));
+    el.querySelectorAll("[data-carry]").forEach((b) => (b.onclick = () => {
+      const p = state.players.find((x) => x.id === b.dataset.carry);
+      const v = prompt(`Medbragte ranglistepoint for ${p.name} (før turneringen):`, String(p.carry || 0));
+      if (v == null) return;
+      const carry = parseInt(v, 10);
+      if (isNaN(carry) || carry < 0) return toast("Skriv et helt tal, fx 46");
+      guarded(async () => { await api.setCarry(p.id, carry); });
     }));
     el.querySelectorAll("[data-unconfirm]").forEach((b) => (b.onclick = () => {
       const p = state.players.find((x) => x.id === b.dataset.unconfirm);

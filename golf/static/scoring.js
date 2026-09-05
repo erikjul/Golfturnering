@@ -147,9 +147,9 @@
     return participants - rank + 1;
   }
 
-  /** Samlet stilling: sum af turneringspoint over de færdige runder; lighed afgøres af samlede
-   * Stablefordpoint og derefter laveste HCP-index. Spillere, der ikke deltog på en runde, får 0
-   * Stablefordpoint og 0 turneringspoint for den runde. */
+  /** Samlet rangliste: medbragte ranglistepoint (player.carry) plus rundernes ranglistepoint, flest
+   * øverst; lighed afgøres af Stablefordpoint i turneringen og derefter laveste HCP-index. Spillere,
+   * der ikke deltog på en runde, får 0 Stablefordpoint og 0 ranglistepoint for den runde. */
   function overallStandings(players, roundResults) {
     const rows = players.map((p) => {
       const perRound = roundResults.map((rr) => {
@@ -163,9 +163,10 @@
           played: row.played,
         };
       });
-      const points = perRound.reduce((s, r) => s + (r.points || 0), 0);
+      const carry = p.carry || 0;
+      const earned = perRound.reduce((s, r) => s + (r.points || 0), 0);
       const stableford = perRound.reduce((s, r) => s + (r.stableford || 0), 0);
-      return { id: p.id, name: p.name, hcp: p.hcp, perRound, points, stableford };
+      return { id: p.id, name: p.name, hcp: p.hcp, perRound, carry, earned, points: carry + earned, stableford };
     });
     rows.sort(
       (a, b) =>

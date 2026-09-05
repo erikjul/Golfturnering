@@ -50,7 +50,9 @@ def test_forside_og_state(client):
     # Deltagerlisten ligger klar fra start; ingen har bekræftet endnu
     assert len(st["players"]) == 20
     erik = next(p for p in st["players"] if p["name"] == "Erik Jul Nielsen")
-    assert erik["dgu"] == "95-20180097" and erik["hcp"] == 17.5 and erik["hcpByRound"] == {}
+    assert erik["dgu"] == "95-20180097" and erik["hcp"] == 17.5 and erik["hcpByRound"] == {} and erik["carry"] == 46
+    assert next(p for p in st["players"] if p["name"] == "Claus Ladevig")["carry"] == 64
+    assert sum(p["carry"] for p in st["players"]) == 662
     assert st["pinRequired"] is True
     assert client.get("/api/state", params={"since": st["version"]}).json()["unchanged"] is True
 
@@ -128,6 +130,7 @@ def test_gammelt_format_migreres_og_deltagerliste_laegges_ind(golf):
     assert navne.count("Erik Jul Nielsen") == 1 and len(st["players"]) == 20  # kendt navn genbruges, 19 tilføjes
     erik = st["players"][0]
     assert erik["id"] == "p1" and "absent" not in erik and erik["hcpByRound"] == {} and erik["dgu"] == ""
+    assert erik["carry"] == 46  # medbragte point slås op på navnet
     assert st["settings"]["rounds"][0]["tees"] == [{"name": "Gul", "cr": 71.0, "slope": 120}]
     assert st["seeded"] is True
 
@@ -148,6 +151,12 @@ def test_pin_beskytter_farlige_handlinger(client):
     assert client.delete(f"/api/players/{p['id']}", headers={"X-Golf-Pin": "1234"}).status_code == 200
     st = client.get("/api/state").json()
     assert all(q["id"] != p["id"] for q in st["players"]) and st["scores"]["0"] == {}
+
+    # Medbragte point kræver PIN
+    erik0 = next(q for q in st["players"] if q["name"] == "Erik Jul Nielsen")
+    assert client.put(f"/api/players/{erik0['id']}/carry", json={"carry": 50}).status_code == 401
+    assert client.put(f"/api/players/{erik0['id']}/carry", json={"carry": 50}, headers={"X-Golf-Pin": "1234"}).json()["player"]["carry"] == 50
+    assert client.put(f"/api/players/{erik0['id']}/carry", json={"carry": -1}, headers={"X-Golf-Pin": "1234"}).status_code == 422
 
     # Nulstil: scorer og bekræftelser væk, deltagerlisten tilbage
     erik = next(q for q in st["players"] if q["name"] == "Erik Jul Nielsen")
@@ -263,11 +272,11 @@ assert.strictEqual(S.tournamentPoints(18, 18), 1);
 // runden er først færdig når alle deltagere har 18 huller
 const all3 = (h) => ({"0": h, "1": h, "2": h});
 const players = [
-  {id: "a", name: "Anna", hcp: 10.0, hcpByRound: all3(10.0)},
-  {id: "b", name: "Bent", hcp: 14.0, hcpByRound: all3(14.0)},
-  {id: "c", name: "Carl", hcp: 5.0, hcpByRound: all3(5.0)},
-  {id: "d", name: "Dorte", hcp: 30.0, hcpByRound: {"1": 30.0, "2": 30.0}},  // ikke bekræftet til runde 0
-  {id: "e", name: "Ebbe", hcp: 12.0, hcpByRound: {}},                       // på listen, deltager aldrig
+  {id: "a", name: "Anna", hcp: 10.0, hcpByRound: all3(10.0), carry: 0},
+  {id: "b", name: "Bent", hcp: 14.0, hcpByRound: all3(14.0), carry: 0},
+  {id: "c", name: "Carl", hcp: 5.0, hcpByRound: all3(5.0), carry: 0},
+  {id: "d", name: "Dorte", hcp: 30.0, hcpByRound: {"1": 30.0, "2": 30.0}, carry: 0},  // ikke bekræftet til runde 0
+  {id: "e", name: "Ebbe", hcp: 12.0, hcpByRound: {}, carry: 0},                       // på listen, deltager aldrig
 ];
 // Rundens bekræftede hcp bruges, ikke det senest kendte
 assert.strictEqual(S.scorecard(S.playerForRound({id: "x", name: "X", hcp: 20.0, hcpByRound: {"0": 12.4}}, 0), course, null, 100).playingHcp, 12);
@@ -306,6 +315,11 @@ const ebbe = overall.find(r => r.name === "Ebbe");
 assert.deepStrictEqual(ebbe.perRound.map(pr => [pr.participated, pr.points, pr.stableford]), [[false, 0, 0], [false, 0, 0], [false, 0, 0]]);
 const dorte = overall.find(r => r.name === "Dorte");
 assert.deepStrictEqual(dorte.perRound.map(pr => [pr.participated, pr.points]), [[false, 0], [true, 6], [true, null]]);
+// Medbragte ranglistepoint lægges til og afgør rækkefølgen: Ebbe har 30 med og deltager ikke,
+// Carl har 5 med (2 optjent -> 7), Bent 0 med (8 optjent)
+const carried = players.map(p => ({...p, carry: p.name === "Ebbe" ? 30 : p.name === "Carl" ? 5 : 0}));
+const ov2 = S.overallStandings(carried, [r0, r1, r2]);
+assert.deepStrictEqual(ov2.map(r => [r.name, r.carry, r.earned, r.points]), [["Ebbe", 30, 0, 30], ["Bent", 0, 8, 8], ["Carl", 5, 2, 7], ["Dorte", 0, 6, 6], ["Anna", 0, 4, 4]]);
 // 18 deltagere: 20, 17, 16, ..., 1
 const eighteen = Array.from({length: 18}, (_, i) => ({id: "p" + i, name: "P" + String(i).padStart(2, "0"), hcp: 10 + i, hcpByRound: {"0": 10 + i}}));
 const sc18 = Object.fromEntries(eighteen.map((p, i) => [p.id, par.map((x, h) => h < i ? x + 1 : x)]));  // P00 bedst

@@ -70,46 +70,49 @@ RUNDER = [
     ("2026-09-20", "Søndag"),
 ]
 
-# Deltagerlisten (navn, DGU-nr, HCP-index pr. 15/8 2026). Indekset er kun en startværdi: spilleren
-# bekræfter sit aktuelle indeks inden hver runde, og først da tæller vedkommende med på runden.
+# Deltagerlisten (navn, DGU-nr, HCP-index pr. 15/8 2026, ranglistepoint før turneringen).
+# Indekset er kun en startværdi: spilleren bekræfter sit aktuelle indeks inden hver runde, og først
+# da tæller vedkommende med på runden. Ranglistepointene er stillingen efter Horsens 15/8; rundernes
+# point lægges til løbende.
 STANDARD_SPILLERE = [
-    ("Claus Ladevig", "27-4183", 17.3),
-    ("Lars Tørslev", "27-498", 10.0),
-    ("Henrik Sørensen", "27-47", 22.4),
-    ("Søren Palmelund", "27-4666", 10.8),
-    ("Lars Scheuer", "95-20200053", 16.4),
-    ("Dennis Nymark", "89-4100", 5.9),
-    ("Erik Jul Nielsen", "95-20180097", 17.5),
-    ("Michael Søndergaard", "27-4809", 31.9),
-    ("Tony Juul Andersen", "184-2033", 17.8),
-    ("Finn Maach", "27-6353", 22.3),
-    ("Christian Alsing", "44-1097", 8.3),
-    ("Henrik Jensen", "96-5504", 36.9),
-    ("Jess Bæk", "117-1047", 11.6),
-    ("Claus Krøyer", "95-20190302", 26.4),
-    ("Lars Feldskou", "95-20200434", 21.0),
-    ("Henrik Laursen", "153-215", 25.4),
-    ("Rico Soos", "95-25186", 14.4),
-    ("Jon Jarlgaard", "27-4560", 20.2),
-    ("Thomas Pedersen", "86-161", 5.4),
-    ("Kalle Nielsen", "27-2016", 22.3),
+    ("Claus Ladevig", "27-4183", 17.3, 64),
+    ("Lars Tørslev", "27-498", 10.0, 59),
+    ("Henrik Sørensen", "27-47", 22.4, 55),
+    ("Søren Palmelund", "27-4666", 10.8, 51),
+    ("Lars Scheuer", "95-20200053", 16.4, 51),
+    ("Dennis Nymark", "89-4100", 5.9, 49),
+    ("Erik Jul Nielsen", "95-20180097", 17.5, 46),
+    ("Michael Søndergaard", "27-4809", 31.9, 43),
+    ("Tony Juul Andersen", "184-2033", 17.8, 41),
+    ("Finn Maach", "27-6353", 22.3, 36),
+    ("Christian Alsing", "44-1097", 8.3, 31),
+    ("Henrik Jensen", "96-5504", 36.9, 23),
+    ("Jess Bæk", "117-1047", 11.6, 23),
+    ("Claus Krøyer", "95-20190302", 26.4, 17),
+    ("Lars Feldskou", "95-20200434", 21.0, 16),
+    ("Henrik Laursen", "153-215", 25.4, 15),
+    ("Rico Soos", "95-25186", 14.4, 13),
+    ("Jon Jarlgaard", "27-4560", 20.2, 13),
+    ("Thomas Pedersen", "86-161", 5.4, 10),
+    ("Kalle Nielsen", "27-2016", 22.3, 6),
 ]
 
 
-def ny_spiller(navn: str, hcp: float, dgu: str = "", tee: str = "") -> dict[str, Any]:
+def ny_spiller(navn: str, hcp: float, dgu: str = "", tee: str = "", carry: int = 0) -> dict[str, Any]:
     return {
         "id": "p" + secrets.token_hex(4),
         "name": navn,
         "dgu": dgu,
         "hcp": hcp,  # senest kendte HCP-index (startværdi for næste bekræftelse)
         "hcpByRound": {},  # runde -> bekræftet HCP-index; kun bekræftede spillere deltager på runden
+        "carry": carry,  # ranglistepoint medbragt fra tidligere runder
         "tee": tee,
         "created": time.time(),
     }
 
 
 def standard_spillere() -> list[dict[str, Any]]:
-    return [ny_spiller(n, h, d) for n, d, h in STANDARD_SPILLERE]
+    return [ny_spiller(n, h, d, carry=c) for n, d, h, c in STANDARD_SPILLERE]
 
 
 def standard_state() -> dict[str, Any]:
@@ -169,10 +172,12 @@ class Lager:
                     r["tees"] = [{"name": r.pop("tee", "") or "Standard", "cr": r.pop("cr", 72.0), "slope": r.pop("slope", 113)}]
                 for k, v in g.items():
                     r.setdefault(k, v)
+            medbragt = {n.casefold(): c for n, _d, _h, c in STANDARD_SPILLERE}
             for p in state["players"]:
                 p.setdefault("tee", "")
                 p.setdefault("dgu", "")
                 p.setdefault("hcpByRound", {})
+                p.setdefault("carry", medbragt.get(p["name"].casefold(), 0))
                 p.pop("absent", None)
             if not state.get("seeded"):  # deltagerlisten lægges ind én gang; kendte navne genbruges
                 kendte = {p["name"].casefold() for p in state["players"]}
@@ -250,6 +255,10 @@ class Bekraeftelse(BaseModel):
     tee: str | None = None
 
 
+class Medbragt(BaseModel):
+    carry: int = Field(ge=0, le=10000)
+
+
 class Slag(BaseModel):
     # None = ryd hullet, 0 = streget (hullet opgivet), ellers antal slag
     strokes: int | None = Field(default=None, ge=0, le=30)
@@ -313,7 +322,7 @@ def opret_spiller(data: NySpiller) -> dict[str, Any]:
     with lager.lock:
         if any(p["name"].casefold() == navn.casefold() for p in lager.state["players"]):
             raise HTTPException(409, "Der er allerede en spiller med det navn")
-        spiller = ny_spiller(navn, hcp, data.dgu.strip()[:20], data.tee.strip()[:30])
+        spiller = ny_spiller(navn, hcp, data.dgu.strip()[:20], data.tee.strip()[:30], carry=0)
         lager.state["players"].append(spiller)
         lager.gem()
         return {"player": spiller, "version": lager.state["version"]}
@@ -358,6 +367,17 @@ def bekraeft(pid: str, r: int, data: Bekraeftelse, x_golf_pin: str | None = Head
         p["hcp"] = hcp
         if data.tee is not None:
             p["tee"] = data.tee.strip()[:30]
+        lager.gem()
+        return {"player": p, "version": lager.state["version"]}
+
+
+@app.put("/api/players/{pid}/carry")
+def ret_medbragt(pid: str, data: Medbragt, x_golf_pin: str | None = Header(default=None)) -> dict[str, Any]:
+    """Retter de ranglistepoint, spilleren har med sig fra tidligere runder. Kræver PIN."""
+    kraev_pin(x_golf_pin)
+    with lager.lock:
+        p = find_spiller(pid)
+        p["carry"] = data.carry
         lager.gem()
         return {"player": p, "version": lager.state["version"]}
 
