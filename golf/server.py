@@ -70,6 +70,47 @@ RUNDER = [
     ("2026-09-20", "Søndag"),
 ]
 
+# Deltagerlisten (navn, DGU-nr, HCP-index pr. 15/8 2026). Indekset er kun en startværdi: spilleren
+# bekræfter sit aktuelle indeks inden hver runde, og først da tæller vedkommende med på runden.
+STANDARD_SPILLERE = [
+    ("Claus Ladevig", "27-4183", 17.3),
+    ("Lars Tørslev", "27-498", 10.0),
+    ("Henrik Sørensen", "27-47", 22.4),
+    ("Søren Palmelund", "27-4666", 10.8),
+    ("Lars Scheuer", "95-20200053", 16.4),
+    ("Dennis Nymark", "89-4100", 5.9),
+    ("Erik Jul Nielsen", "95-20180097", 17.5),
+    ("Michael Søndergaard", "27-4809", 31.9),
+    ("Tony Juul Andersen", "184-2033", 17.8),
+    ("Finn Maach", "27-6353", 22.3),
+    ("Christian Alsing", "44-1097", 8.3),
+    ("Henrik Jensen", "96-5504", 36.9),
+    ("Jess Bæk", "117-1047", 11.6),
+    ("Claus Krøyer", "95-20190302", 26.4),
+    ("Lars Feldskou", "95-20200434", 21.0),
+    ("Henrik Laursen", "153-215", 25.4),
+    ("Rico Soos", "95-25186", 14.4),
+    ("Jon Jarlgaard", "27-4560", 20.2),
+    ("Thomas Pedersen", "86-161", 5.4),
+    ("Kalle Nielsen", "27-2016", 22.3),
+]
+
+
+def ny_spiller(navn: str, hcp: float, dgu: str = "", tee: str = "") -> dict[str, Any]:
+    return {
+        "id": "p" + secrets.token_hex(4),
+        "name": navn,
+        "dgu": dgu,
+        "hcp": hcp,  # senest kendte HCP-index (startværdi for næste bekræftelse)
+        "hcpByRound": {},  # runde -> bekræftet HCP-index; kun bekræftede spillere deltager på runden
+        "tee": tee,
+        "created": time.time(),
+    }
+
+
+def standard_spillere() -> list[dict[str, Any]]:
+    return [ny_spiller(n, h, d) for n, d, h in STANDARD_SPILLERE]
+
 
 def standard_state() -> dict[str, Any]:
     return {
@@ -91,7 +132,8 @@ def standard_state() -> dict[str, Any]:
                 for d, lab in RUNDER
             ],
         },
-        "players": [],
+        "players": standard_spillere(),
+        "seeded": True,
         "scores": {str(i): {} for i in range(ANTAL_RUNDER)},
     }
 
@@ -129,6 +171,13 @@ class Lager:
                     r.setdefault(k, v)
             for p in state["players"]:
                 p.setdefault("tee", "")
+                p.setdefault("dgu", "")
+                p.setdefault("hcpByRound", {})
+                p.pop("absent", None)
+            if not state.get("seeded"):  # deltagerlisten lægges ind én gang; kendte navne genbruges
+                kendte = {p["name"].casefold() for p in state["players"]}
+                state["players"] += [p for p in standard_spillere() if p["name"].casefold() not in kendte]
+                state["seeded"] = True
             return state
         return standard_state()
 
@@ -186,12 +235,18 @@ class NySpiller(BaseModel):
     name: str
     hcp: float
     tee: str = ""
+    dgu: str = ""
 
 
 class RetSpiller(BaseModel):
     name: str | None = None
     hcp: float | None = None
-    absent: list[bool] | None = None
+    tee: str | None = None
+    dgu: str | None = None
+
+
+class Bekraeftelse(BaseModel):
+    hcp: float
     tee: str | None = None
 
 
@@ -258,14 +313,7 @@ def opret_spiller(data: NySpiller) -> dict[str, Any]:
     with lager.lock:
         if any(p["name"].casefold() == navn.casefold() for p in lager.state["players"]):
             raise HTTPException(409, "Der er allerede en spiller med det navn")
-        spiller = {
-            "id": "p" + secrets.token_hex(4),
-            "name": navn,
-            "hcp": hcp,
-            "tee": data.tee.strip()[:30],
-            "absent": [False] * ANTAL_RUNDER,
-            "created": time.time(),
-        }
+        spiller = ny_spiller(navn, hcp, data.dgu.strip()[:20], data.tee.strip()[:30])
         lager.state["players"].append(spiller)
         lager.gem()
         return {"player": spiller, "version": lager.state["version"]}
@@ -282,12 +330,50 @@ def ret_spiller(pid: str, data: RetSpiller) -> dict[str, Any]:
             p["name"] = navn
         if data.hcp is not None:
             p["hcp"] = tjek_hcp(data.hcp)
-        if data.absent is not None:
-            if len(data.absent) != ANTAL_RUNDER:
-                raise HTTPException(422, "absent skal have én værdi pr. runde")
-            p["absent"] = [bool(x) for x in data.absent]
         if data.tee is not None:
             p["tee"] = data.tee.strip()[:30]
+        if data.dgu is not None:
+            p["dgu"] = data.dgu.strip()[:20]
+        lager.gem()
+        return {"player": p, "version": lager.state["version"]}
+
+
+@app.put("/api/players/{pid}/confirm/{r}")
+def bekraeft(pid: str, r: int, data: Bekraeftelse, x_golf_pin: str | None = Header(default=None)) -> dict[str, Any]:
+    """Spilleren bekræfter sit aktuelle HCP-index (og tee) til runden og deltager dermed på den.
+    Er der allerede tastet scorer på runden, kræver en ændring af indekset PIN."""
+    tjek_runde(r)
+    hcp = tjek_hcp(data.hcp)
+    with lager.lock:
+        p = find_spiller(pid)
+        if lager.state["settings"]["rounds"][r]["closed"]:
+            raise HTTPException(409, "Runden er lukket")
+        gammel = p["hcpByRound"].get(str(r))
+        har_scorer = pid in lager.state["scores"][str(r)]
+        if har_scorer and gammel is not None and gammel != hcp:
+            kraev_pin(x_golf_pin)
+            if not PIN:
+                raise HTTPException(409, "Handicap kan ikke ændres, når der er tastet scorer på runden")
+        p["hcpByRound"][str(r)] = hcp
+        p["hcp"] = hcp
+        if data.tee is not None:
+            p["tee"] = data.tee.strip()[:30]
+        lager.gem()
+        return {"player": p, "version": lager.state["version"]}
+
+
+@app.delete("/api/players/{pid}/confirm/{r}")
+def fortryd_bekraeftelse(pid: str, r: int, x_golf_pin: str | None = Header(default=None)) -> dict[str, Any]:
+    """Trækker deltagelsen på runden tilbage. Med scorer på runden kræves PIN, og scorerne slettes."""
+    tjek_runde(r)
+    with lager.lock:
+        p = find_spiller(pid)
+        if pid in lager.state["scores"][str(r)]:
+            kraev_pin(x_golf_pin)
+            if not PIN:
+                raise HTTPException(409, "Der er tastet scorer på runden")
+            del lager.state["scores"][str(r)][pid]
+        p["hcpByRound"].pop(str(r), None)
         lager.gem()
         return {"player": p, "version": lager.state["version"]}
 
@@ -310,9 +396,11 @@ def gem_slag(r: int, pid: str, hul: int, data: Slag) -> dict[str, Any]:
     if not 1 <= hul <= 18:
         raise HTTPException(404, "Hullet findes ikke")
     with lager.lock:
-        find_spiller(pid)
+        p = find_spiller(pid)
         if lager.state["settings"]["rounds"][r]["closed"]:
             raise HTTPException(409, "Runden er lukket, så der kan ikke tastes flere scorer")
+        if str(r) not in p["hcpByRound"]:
+            raise HTTPException(409, "Bekræft dit HCP-index til runden, før du taster scorer")
         kort = lager.state["scores"][str(r)].setdefault(pid, [None] * 18)
         kort[hul - 1] = data.strokes
         if all(s is None for s in kort):
@@ -361,10 +449,12 @@ def luk_runde(r: int, request: Request, x_golf_pin: str | None = Header(default=
 
 @app.post("/api/reset")
 def nulstil(x_golf_pin: str | None = Header(default=None)) -> dict[str, Any]:
-    """Sletter alle spillere og scorer, men beholder baneopsætningen. Kræver PIN, hvis en er sat."""
+    """Sletter alle scorer og bekræftelser og lægger deltagerlisten ind igen. Baneopsætningen
+    beholdes. Kræver PIN, hvis en er sat."""
     kraev_pin(x_golf_pin)
     with lager.lock:
-        lager.state["players"] = []
+        lager.state["players"] = standard_spillere()
+        lager.state["seeded"] = True
         lager.state["scores"] = {str(i): {} for i in range(ANTAL_RUNDER)}
         for rd in lager.state["settings"]["rounds"]:
             rd["closed"] = False

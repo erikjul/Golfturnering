@@ -65,6 +65,20 @@
     return Math.max(0, 2 + par + received - strokes);
   }
 
+  /** Det HCP-index spilleren har bekræftet til runden, eller null hvis spilleren ikke deltager. */
+  function hcpForRound(player, roundIdx) {
+    const m = player.hcpByRound;
+    if (!m) return null;
+    const v = m[String(roundIdx)];
+    return v == null ? null : v;
+  }
+
+  /** Spilleren med rundens bekræftede HCP-index som hcp, eller null hvis ikke bekræftet. */
+  function playerForRound(player, roundIdx) {
+    const h = hcpForRound(player, roundIdx);
+    return h == null ? null : { ...player, hcp: h };
+  }
+
   /** Hul for hul-opgørelse for én spiller på én runde. */
   function scorecard(player, course, strokesList, allowancePct) {
     const ph = playingHandicap(player.hcp, course, allowancePct, player.tee);
@@ -102,13 +116,16 @@
    * Stilling på en runde. Returnerer rækker sorteret, om runden er færdig, og turneringspoint
    * hvis den er.
    *
-   * players: [{id, name, hcp, absent: [bool×3]}], scores: {playerId: [18 × (int|null)]}
-   * Runden er færdig, når alle tilmeldte (ikke fraværende) spillere har 18 huller, eller når den
-   * er lukket manuelt. Ved manuel lukning tæller kun spillere, der har indtastet mindst ét hul.
+   * players: [{id, name, hcp, hcpByRound: {"0": 17.5, ...}}], scores: {playerId: [18 × (int|null)]}
+   * Kun spillere, der har bekræftet deres HCP-index til runden, deltager; de øvrige på listen får
+   * hverken placering eller point og tæller ikke med i deltagerantallet. Runden er færdig, når alle
+   * deltagere har 18 huller, eller når den er lukket manuelt. Ved manuel lukning tæller kun
+   * deltagere, der har indtastet mindst ét hul.
    */
   function roundStandings(players, course, scores, roundIdx, allowancePct, closed) {
     let rows = players
-      .filter((p) => !(p.absent && p.absent[roundIdx]))
+      .map((p) => playerForRound(p, roundIdx))
+      .filter(Boolean)
       .map((p) => {
         const card = scorecard(p, course, scores[p.id], allowancePct);
         return { id: p.id, name: p.name, hcp: p.hcp, ...card };
@@ -131,16 +148,19 @@
   }
 
   /** Samlet stilling: sum af turneringspoint over de færdige runder; lighed afgøres af samlede
-   * Stablefordpoint og derefter laveste HCP-index. */
+   * Stablefordpoint og derefter laveste HCP-index. Spillere, der ikke deltog på en runde, får 0
+   * Stablefordpoint og 0 turneringspoint for den runde. */
   function overallStandings(players, roundResults) {
     const rows = players.map((p) => {
       const perRound = roundResults.map((rr) => {
         const row = rr.rows.find((r) => r.id === p.id);
+        if (!row) return { participated: false, points: 0, stableford: 0, rank: null, played: 0 };
         return {
-          points: row ? row.tournamentPoints : null,
-          stableford: row ? row.total : null,
-          rank: row ? row.rank : null,
-          played: row ? row.played : 0,
+          participated: true,
+          points: row.tournamentPoints,
+          stableford: row.total,
+          rank: row.rank,
+          played: row.played,
         };
       });
       const points = perRound.reduce((s, r) => s + (r.points || 0), 0);
@@ -159,6 +179,8 @@
     roundHalfAway,
     courseHandicap,
     teeFor,
+    hcpForRound,
+    playerForRound,
     playingHandicap,
     strokesOnHole,
     stablefordPoints,

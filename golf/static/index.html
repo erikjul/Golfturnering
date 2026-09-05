@@ -377,6 +377,11 @@ details summary { cursor: pointer; font-weight: 600; padding: 6px 0; }
       "56": [320, 350, 445, 140, 345, 320, 320, 150, 435, 435, 130, 325, 330, 435, 145, 345, 360, 285],
       "61": [336, 380, 485, 173, 345, 346, 320, 172, 438, 452, 149, 359, 330, 512, 172, 416, 370, 340],
     },
+    players: [["Claus Ladevig", "27-4183", 17.3], ["Lars Tørslev", "27-498", 10.0], ["Henrik Sørensen", "27-47", 22.4], ["Søren Palmelund", "27-4666", 10.8],
+      ["Lars Scheuer", "95-20200053", 16.4], ["Dennis Nymark", "89-4100", 5.9], ["Erik Jul Nielsen", "95-20180097", 17.5], ["Michael Søndergaard", "27-4809", 31.9],
+      ["Tony Juul Andersen", "184-2033", 17.8], ["Finn Maach", "27-6353", 22.3], ["Christian Alsing", "44-1097", 8.3], ["Henrik Jensen", "96-5504", 36.9],
+      ["Jess Bæk", "117-1047", 11.6], ["Claus Krøyer", "95-20190302", 26.4], ["Lars Feldskou", "95-20200434", 21.0], ["Henrik Laursen", "153-215", 25.4],
+      ["Rico Soos", "95-25186", 14.4], ["Jon Jarlgaard", "27-4560", 20.2], ["Thomas Pedersen", "86-161", 5.4], ["Kalle Nielsen", "27-2016", 22.3]],
     rules: `## Lokalregler (Samsø Golfklub)
 Banemarkeringer: hvide = out of bounds, røde = strafområde, blå = areal under reparation, grøn top = spilleforbud.
 1. Out of bounds defineres som linjen mellem de banenære punkter af hvide pæle i jordhøjde.
@@ -417,6 +422,8 @@ Drikkevand foran hul 1 og 10. Toiletter ved hul 10 og 13. Hjertestarter ved klub
       addPlayer: (p) => call("POST", "api/players", p),
       updatePlayer: (id, p) => call("PUT", "api/players/" + id, p),
       deletePlayer: (id) => call("DELETE", "api/players/" + id),
+      confirm: (id, r, body) => call("PUT", `api/players/${id}/confirm/${r}`, body),
+      unconfirm: (id, r) => call("DELETE", `api/players/${id}/confirm/${r}`),
       setScore: (r, pid, hole, strokes) => call("PUT", `api/scores/${r}/${pid}/${hole}`, { strokes }),
       saveSettings: (s) => call("PUT", "api/settings", s),
       setClosed: (r, v) => call("POST", `api/rounds/${r}/closed?value=${v ? 1 : 0}`),
@@ -436,8 +443,11 @@ Drikkevand foran hul 1 og 10. Toiletter ved hul 10 og 13. Hjertestarter ved klub
             date, label, course: "Samsø Golfklub", tees: [{ name: "56", cr: 70.8, slope: 131, lengths: SAMSOE.lengths["56"].slice() }, { name: "49", cr: 66.9, slope: 122, lengths: SAMSOE.lengths["49"].slice() }], par: PAR.slice(), si: SI.slice(), closed: false,
           })),
         },
-        players: [], scores: { 0: {}, 1: {}, 2: {} },
+        players: SAMSOE.players.map(([name, dgu, hcp]) => newPlayer(name, hcp, dgu, "")), scores: { 0: {}, 1: {}, 2: {} },
       };
+    }
+    function newPlayer(name, hcp, dgu, tee) {
+      return { id: "p" + Math.random().toString(16).slice(2, 10), name, dgu: dgu || "", hcp, hcpByRound: {}, tee: tee || "", created: Date.now() / 1000 };
     }
     let st = ls.get("golf.demo", null) || fresh();
     const save = () => { st.version++; ls.set("golf.demo", st); };
@@ -447,13 +457,26 @@ Drikkevand foran hul 1 og 10. Toiletter ved hul 10 og 13. Hjertestarter ved klub
       async state(since) { return since === st.version ? { unchanged: true, version: since } : JSON.parse(JSON.stringify({ ...st, pinRequired: false })); },
       async addPlayer(p) {
         if (st.players.some((x) => x.name.toLowerCase() === p.name.toLowerCase())) throw new Error("Der er allerede en spiller med det navn");
-        const player = { id: "p" + Math.random().toString(16).slice(2, 10), name: p.name, hcp: p.hcp, tee: p.tee || "", absent: [false, false, false], created: Date.now() / 1000 };
+        const player = newPlayer(p.name, p.hcp, p.dgu, p.tee);
         st.players.push(player); save(); return { player };
       },
       async updatePlayer(id, p) { const x = find(id); Object.assign(x, p); save(); return { player: x }; },
+      async confirm(id, r, body) {
+        const x = find(id);
+        if (st.settings.rounds[r].closed) throw new Error("Runden er lukket");
+        const old = x.hcpByRound[r];
+        if (st.scores[r][id] && old != null && old !== body.hcp) throw new Error("Handicap kan ikke ændres, når der er tastet scorer på runden");
+        x.hcpByRound[r] = body.hcp; x.hcp = body.hcp; if (body.tee != null) x.tee = body.tee; save(); return { player: x };
+      },
+      async unconfirm(id, r) {
+        const x = find(id);
+        if (st.scores[r][id]) throw new Error("Der er tastet scorer på runden");
+        delete x.hcpByRound[r]; save(); return { player: x };
+      },
       async deletePlayer(id) { st.players = st.players.filter((x) => x.id !== id); Object.values(st.scores).forEach((r) => delete r[id]); save(); return { ok: true }; },
       async setScore(r, pid, hole, strokes) {
         if (st.settings.rounds[r].closed) throw new Error("Runden er lukket");
+        if (find(pid).hcpByRound[r] == null) throw new Error("Bekræft dit HCP-index til runden, før du taster scorer");
         const card = st.scores[r][pid] || (st.scores[r][pid] = Array(18).fill(null));
         card[hole - 1] = strokes; if (card.every((s) => s == null)) delete st.scores[r][pid]; save(); return { ok: true };
       },
@@ -502,6 +525,8 @@ Drikkevand foran hul 1 og 10. Toiletter ved hul 10 og 13. Hjertestarter ved klub
   }
 
   const me = () => (state ? state.players.find((p) => p.id === meId) : null) || null;
+  /** Mig med rundens bekræftede HCP-index, eller null hvis jeg ikke har bekræftet til runden. */
+  const meForRound = () => { const m = me(); return m ? S.playerForRound(m, round) : null; };
   /** Alle tee-navne i turneringen (på tværs af runder), i den rækkefølge de er sat op. */
   function teeNames() {
     const names = [];
@@ -548,7 +573,7 @@ Drikkevand foran hul 1 og 10. Toiletter ved hul 10 og 13. Hjertestarter ved klub
     $("#title").textContent = state.settings.name || "Golfturnering";
     document.title = state.settings.name || "Golfturnering";
     const rs = state.settings.rounds;
-    $("#subtitle").textContent = fmtDate(rs[0].date) + "–" + fmtDate(rs[2].date) + " · Stableford · " + state.players.length + " spillere";
+    $("#subtitle").textContent = fmtDate(rs[0].date) + "–" + fmtDate(rs[2].date) + " · Stableford · " + state.players.length + " på listen";
     renderRounds();
     renderMe();
     document.querySelectorAll("#views button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.view === view)));
@@ -574,17 +599,21 @@ Drikkevand foran hul 1 og 10. Toiletter ved hul 10 og 13. Hjertestarter ved klub
   function renderMe() {
     const el = $("#me-card");
     const m = me();
-    if (m && !editingMe) {
-      const c = courseOf(round);
-      const ph = S.playingHandicap(m.hcp, c, state.settings.allowance, m.tee);
+    const c = courseOf(round);
+    const day = dayLabel(c).toLowerCase();
+    const confirmedHcp = m ? S.hcpForRound(m, round) : null;
+    const hasScores = m ? !!scoresOf(round)[m.id] : false;
+
+    // Valgt og bekræftet til runden
+    if (m && confirmedHcp != null && !editingMe) {
+      const ph = S.playingHandicap(confirmedHcp, c, state.settings.allowance, m.tee);
       const tee = S.teeFor(c, m.tee);
-      const absent = m.absent && m.absent[round];
       el.innerHTML = `
         <div class="who">
           <div class="avatar">${esc(initials(m.name))}</div>
           <div class="grow">
             <div class="name">${esc(m.name)}</div>
-            <div class="hcp chips num"><span class="chip">HCP <b>${fmtHcp(m.hcp)}</b></span><span class="chip accent">Spiller <b>${ph}</b> ${esc(dayLabel(c).toLowerCase())}</span>${teeNames().length > 1 ? `<span class="chip">Tee <b>${esc(tee.name)}</b></span>` : ""}${absent ? '<span class="chip warn">Spiller ikke</span>' : ""}</div>
+            <div class="hcp chips num"><span class="chip">HCP <b>${fmtHcp(confirmedHcp)}</b> ${esc(day)}</span><span class="chip accent">Spiller <b>${ph}</b></span>${teeNames().length > 1 ? `<span class="chip">Tee <b>${esc(tee.name)}</b></span>` : ""}</div>
           </div>
           <button class="btn secondary small" id="btn-edit-me">Ret</button>
           <button class="btn secondary small" id="btn-switch">Skift</button>
@@ -593,48 +622,64 @@ Drikkevand foran hul 1 og 10. Toiletter ved hul 10 og 13. Hjertestarter ved klub
       $("#btn-switch").onclick = () => { meId = null; ls.set("golf.me", null); render(); };
       return;
     }
-    if (m && editingMe) {
+
+    // Valgt: bekræft HCP-index til runden (eller ret oplysninger)
+    if (m) {
+      const editing = editingMe;
       el.innerHTML = `
-        <h2>Ret dine oplysninger</h2>
-        <form id="form-edit" class="row" style="align-items:end">
-          <label class="f grow">Navn<input type="text" name="name" value="${esc(m.name)}" required maxlength="60"></label>
-          <label class="f" style="width:110px">HCP-index<input type="text" name="hcp" inputmode="decimal" value="${fmtHcp(m.hcp)}" required></label>
+        <div class="who" style="margin-bottom:12px">
+          <div class="avatar">${esc(initials(m.name))}</div>
+          <div class="grow"><div class="name">${esc(m.name)}</div>${m.dgu ? `<div class="muted" style="font-size:13px">DGU-nr. ${esc(m.dgu)}</div>` : ""}</div>
+          <button class="btn secondary small" id="btn-switch">Skift</button>
+        </div>
+        <span class="eyebrow">${editing ? "Ret dine oplysninger" : "Bekræft dit DGU-handicapindeks til " + esc(day)}</span>
+        <form id="form-confirm" class="row" style="align-items:end;margin-top:8px">
+          ${editing ? `<label class="f grow">Navn<input type="text" name="name" value="${esc(m.name)}" required maxlength="60"></label>
+          <label class="f" style="width:130px">DGU-nr.<input type="text" name="dgu" value="${esc(m.dgu || "")}" maxlength="20"></label>` : ""}
+          <label class="f" style="width:130px">HCP-index ${esc(day)}<input type="text" name="hcp" inputmode="decimal" value="${fmtHcp(confirmedHcp != null ? confirmedHcp : m.hcp)}" required ${hasScores ? 'title="Kræver PIN, da der er tastet scorer"' : ""}></label>
           ${teeSelect("tee", m.tee)}
-          <div style="flex-basis:100%"></div>
-          ${state.settings.rounds.map((r, i) => `<label class="check"><input type="checkbox" name="absent${i}" ${m.absent && m.absent[i] ? "checked" : ""}> Spiller ikke ${esc(dayLabel(r).toLowerCase())}</label>`).join("")}
-          <div style="flex-basis:100%"></div>
-          <button class="btn" type="submit">Gem</button>
-          <button class="btn secondary" type="button" id="btn-cancel-edit">Annullér</button>
-        </form>`;
-      $("#btn-cancel-edit").onclick = () => { editingMe = false; render(); };
-      $("#form-edit").onsubmit = (ev) => {
+          <button class="btn gold" type="submit">${editing ? "Gem" : "Bekræft"}</button>
+          ${editing ? '<button class="btn secondary" type="button" id="btn-cancel-edit">Annullér</button>' : '<button class="btn secondary small" type="button" id="btn-edit-me">Ret navn</button>'}
+        </form>
+        <p class="muted" style="font-size:13px;margin:10px 0 0">${editing && hasScores ? "Der er tastet scorer på runden, så en ændring af indekset kræver PIN (skrives under Opsætning)." : "Tjek dit aktuelle indeks i Golfbox eller DGU-appen, og ret tallet, hvis det har ændret sig. Først når du har bekræftet, tæller du med på " + esc(day) + " og kan taste scorer."}</p>`;
+      $("#btn-switch").onclick = () => { meId = null; editingMe = false; ls.set("golf.me", null); render(); };
+      const editBtn = $("#btn-edit-me"); if (editBtn) editBtn.onclick = () => { editingMe = true; render(); };
+      const cancel = $("#btn-cancel-edit"); if (cancel) cancel.onclick = () => { editingMe = false; render(); };
+      $("#form-confirm").onsubmit = (ev) => {
         ev.preventDefault();
         const f = ev.target;
         const hcp = parseNum(f.hcp.value);
         if (isNaN(hcp)) return toast("Skriv dit HCP-index, fx 12,4");
-        const absent = [0, 1, 2].map((i) => f["absent" + i].checked);
         const tee = f.tee ? f.tee.value : (m.tee || "");
-        guarded(async () => { await api.updatePlayer(m.id, { name: f.name.value.trim(), hcp, absent, tee }); editingMe = false; });
+        guarded(async () => {
+          if (editing) await api.updatePlayer(m.id, { name: f.name.value.trim(), dgu: f.dgu.value.trim() });
+          await api.confirm(m.id, round, { hcp, tee });
+          editingMe = false;
+          toast(editing ? "Gemt" : "Bekræftet. Du er med " + day + " med HCP " + fmtHcp(hcp) + ".");
+        });
       };
       return;
     }
-    // Ikke valgt: vælg dig selv eller tilmeld dig
+
+    // Ikke valgt: vælg dit navn på deltagerlisten, eller tilføj en ny spiller
     const opts = state.players.slice().sort((a, b) => a.name.localeCompare(b.name, "da"))
-      .map((p) => `<option value="${p.id}">${esc(p.name)} (${fmtHcp(p.hcp)})</option>`).join("");
+      .map((p) => `<option value="${p.id}">${esc(p.name)}${p.dgu ? " · " + esc(p.dgu) : ""}</option>`).join("");
     el.innerHTML = `
       <span class="eyebrow">Hvem er du?</span>
       ${state.players.length ? `
       <div class="row" style="margin-top:8px">
-        <select id="sel-me" class="grow"><option value="">Vælg dit navn …</option>${opts}</select>
+        <select id="sel-me" class="grow"><option value="">Vælg dit navn på deltagerlisten …</option>${opts}</select>
       </div>
-      <p class="muted" style="margin:10px 0 4px">… eller tilmeld dig som ny spiller:</p>` : `<p class="muted">Ingen er tilmeldt endnu. Vær den første:</p>`}
-      <form id="form-join" class="row" style="align-items:end">
+      <details style="margin-top:10px"><summary class="muted" style="font-size:14px">Står du ikke på listen? Tilføj dig som ny spiller</summary>` : `<p class="muted">Deltagerlisten er tom. Tilføj dig som den første:</p>`}
+      <form id="form-join" class="row" style="align-items:end;margin-top:8px">
         <label class="f grow">Navn<input type="text" name="name" required maxlength="60" autocomplete="name" placeholder="Fornavn Efternavn"></label>
+        <label class="f" style="width:120px">DGU-nr.<input type="text" name="dgu" maxlength="20" placeholder="27-1234"></label>
         <label class="f" style="width:110px">HCP-index<input type="text" name="hcp" inputmode="decimal" required placeholder="12,4"></label>
         ${teeSelect("tee", "")}
-        <button class="btn" type="submit">Tilmeld</button>
+        <button class="btn" type="submit">Tilføj</button>
       </form>
-      <p class="muted" style="font-size:13px">Dit DGU-handicap omregnes til spillehandicap efter banens course rating og slope, præcis som klubbens konverteringstabel.</p>`;
+      ${state.players.length ? "</details>" : ""}
+      <p class="muted" style="font-size:13px;margin-top:10px">Inden hver runde bekræfter du dit aktuelle DGU-handicapindeks. Det omregnes til spillehandicap efter banens course rating og slope, præcis som klubbens konverteringstabel.</p>`;
     const sel = $("#sel-me");
     if (sel) sel.onchange = () => { if (sel.value) { meId = sel.value; ls.set("golf.me", meId); render(); } };
     $("#form-join").onsubmit = (ev) => {
@@ -643,7 +688,7 @@ Drikkevand foran hul 1 og 10. Toiletter ved hul 10 og 13. Hjertestarter ved klub
       const hcp = parseNum(f.hcp.value);
       if (isNaN(hcp)) return toast("Skriv dit HCP-index, fx 12,4");
       guarded(async () => {
-        const res = await api.addPlayer({ name: f.name.value.trim(), hcp, tee: f.tee ? f.tee.value : "" });
+        const res = await api.addPlayer({ name: f.name.value.trim(), hcp, dgu: f.dgu.value.trim(), tee: f.tee ? f.tee.value : "" });
         meId = res.player.id; ls.set("golf.me", meId);
       });
     };
@@ -653,9 +698,10 @@ Drikkevand foran hul 1 og 10. Toiletter ved hul 10 og 13. Hjertestarter ved klub
     const el = $("#view-score");
     const m = me();
     const c = courseOf(round);
-    if (!m) { el.innerHTML = `<div class="card empty">Vælg dit navn eller tilmeld dig ovenfor for at taste din score.</div>`; return; }
-    if (m.absent && m.absent[round]) { el.innerHTML = `<div class="card empty">Du er sat til ikke at spille ${esc(dayLabel(c).toLowerCase())}. Tryk <b>Ret</b> ovenfor for at ændre det.</div>`; return; }
-    const card = S.scorecard(m, c, scoresOf(round)[m.id], state.settings.allowance);
+    if (!m) { el.innerHTML = `<div class="card empty">Vælg dit navn ovenfor for at taste din score.</div>`; return; }
+    const mr = meForRound();
+    if (!mr) { el.innerHTML = `<div class="card empty">Bekræft dit HCP-index til ${esc(dayLabel(c).toLowerCase())} ovenfor, så kan du taste din score.</div>`; return; }
+    const card = S.scorecard(mr, c, scoresOf(round)[m.id], state.settings.allowance);
     const lengths = teeLengths(c, m.tee);
     const st = standings(round);
     const myRow = st.rows.find((r) => r.id === m.id);
@@ -716,10 +762,11 @@ Drikkevand foran hul 1 og 10. Toiletter ved hul 10 og 13. Hjertestarter ved klub
       </div>`);
     } else if (st.rows.length) {
       const done = st.rows.filter((r) => r.played === 18).length;
-      parts.push(`<div class="status live">Runden er i gang: ${done} af ${st.rows.length} spillere er færdige. Vinderen og turneringspointene vises, når alle er i hus.</div>`);
+      parts.push(`<div class="status live">Runden er i gang: ${done} af ${st.rows.length} deltagere er færdige. Vinderen og turneringspointene vises, når alle er i hus.</div>`);
     }
+    const notConfirmed = state.players.length - st.rows.length;
     if (!st.rows.length) {
-      parts.push(`<div class="card empty">Ingen spillere på denne runde endnu.</div>`);
+      parts.push(`<div class="card empty">Ingen har bekræftet deres handicap til ${esc(dayLabel(c).toLowerCase())} endnu.</div>`);
     } else {
       parts.push(`<div class="card"><div class="tbl-wrap"><table>
         <thead><tr><th></th><th></th><th>Spiller</th><th class="c">Huller</th><th class="r">Point</th>${st.complete ? '<th class="r">Turn.</th>' : ""}</tr></thead>
@@ -731,7 +778,7 @@ Drikkevand foran hul 1 og 10. Toiletter ved hul 10 og 13. Hjertestarter ved klub
           <td class="r big num">${r.total}</td>
           ${st.complete ? `<td class="r"><span class="tp ${r.rank === 1 ? "win" : ""}">${r.tournamentPoints}</span></td>` : ""}
         </tr>`).join("")}</tbody></table></div>
-        <p class="muted" style="font-size:13px;margin-top:10px">Ved lige Stablefordpoint står den med laveste HCP-index øverst. Turneringspoint: vinderen får antal deltagere + 2, nr. 2 får antal deltagere − 1, og så fremdeles ned til 1 point.</p>
+        <p class="muted" style="font-size:13px;margin-top:10px">Ved lige Stablefordpoint står den med laveste HCP-index øverst. Ranglistepoint: vinderen får antal deltagere + 2, nr. 2 får antal deltagere − 1, og så fremdeles ned til 1 point.${notConfirmed > 0 ? " " + notConfirmed + " på deltagerlisten har ikke bekræftet til denne runde og tæller ikke med." : ""}</p>
       </div>`);
     }
     el.innerHTML = parts.join("");
@@ -756,11 +803,11 @@ Drikkevand foran hul 1 og 10. Toiletter ved hul 10 og 13. Hjertestarter ved klub
       <tbody>${rows.map((r) => `<tr class="${m && r.id === m.id ? "me" : ""}${r.rank === 1 && r.points ? " lead" : ""}">
         <td class="rank num">${r.rank}</td>
         <td class="name"><div class="pname">${esc(r.name)}</div><div class="psub num">HCP ${fmtHcp(r.hcp)}</div></td>
-        ${r.perRound.map((pr, i) => `<td class="c num">${pr.points != null ? `<span class="tp ${pr.rank === 1 ? "win" : ""}" title="${pr.stableford} Stablefordpoint">${pr.points}</span>` : pr.played ? `<span class="muted">${pr.stableford}<small> p</small></span>` : `<span class="muted">–</span>`}</td>`).join("")}
+        ${r.perRound.map((pr, i) => `<td class="c num">${!pr.participated ? `<span class="muted" title="Deltog ikke">0</span>` : pr.points != null ? `<span class="tp ${pr.rank === 1 ? "win" : ""}" title="${pr.stableford} Stablefordpoint">${pr.points}</span>` : pr.played ? `<span class="muted">${pr.stableford}<small> p</small></span>` : `<span class="muted">–</span>`}</td>`).join("")}
         <td class="r big num">${r.points}</td>
         <td class="r num muted">${r.stableford}</td>
       </tr>`).join("")}</tbody></table></div>
-      <p class="muted" style="font-size:13px;margin-top:10px">Samlet stilling efter turneringspoint. Grå tal i rundekolonnerne er Stablefordpoint for runder, der stadig er i gang. Ved lighed tæller flest Stablefordpoint i alt, derefter laveste HCP-index.</p>
+      <p class="muted" style="font-size:13px;margin-top:10px">Samlet stilling efter ranglistepoint. Grå tal i rundekolonnerne er Stablefordpoint for runder, der stadig er i gang; 0 betyder, at spilleren ikke deltog. Ved lighed tæller flest Stablefordpoint i alt, derefter laveste HCP-index.</p>
     </div>`);
     el.innerHTML = parts.join("");
   }
@@ -830,13 +877,14 @@ Drikkevand foran hul 1 og 10. Toiletter ved hul 10 og 13. Hjertestarter ved klub
         </div>`).join("")}
         <div class="row"><button class="btn" id="btn-save-settings">Gem opsætning</button><button class="btn secondary" id="btn-discard">Fortryd ændringer</button></div>
         <details>
-          <summary>Spillere (${state.players.length})</summary>
-          <div class="plist">${state.players.map((p) => `<div><span class="grow">${esc(p.name)} <span class="muted num">HCP ${fmtHcp(p.hcp)}</span></span><button class="btn danger small" data-del="${p.id}">Slet</button></div>`).join("") || '<p class="muted">Ingen tilmeldt.</p>'}</div>
+          <summary>Deltagerliste (${state.players.length}) · bekræftet ${esc(dayLabel(courseOf(round)).toLowerCase())}: ${state.players.filter((p) => S.hcpForRound(p, round) != null).length}</summary>
+          <p class="muted" style="font-size:13px">"Ret HCP" ændrer det bekræftede indeks for den valgte runde (${esc(dayLabel(courseOf(round)).toLowerCase())}) og kræver PIN, hvis der er tastet scorer. "Fjern" trækker spillerens deltagelse på runden tilbage.</p>
+          <div class="plist">${state.players.slice().sort((a, b) => a.name.localeCompare(b.name, "da")).map((p) => { const h = S.hcpForRound(p, round); return `<div><span class="grow">${esc(p.name)} <span class="muted num">${p.dgu ? esc(p.dgu) + " · " : ""}${h != null ? "HCP " + fmtHcp(h) + " bekræftet" : "ikke bekræftet (senest " + fmtHcp(p.hcp) + ")"}</span></span><button class="btn secondary small" data-hcp="${p.id}">Ret HCP</button>${h != null ? `<button class="btn secondary small" data-unconfirm="${p.id}">Fjern</button>` : ""}<button class="btn danger small" data-del="${p.id}">Slet</button></div>`; }).join("") || '<p class="muted">Ingen på listen.</p>'}</div>
         </details>
         <details>
           <summary>Nulstil turneringen</summary>
-          <p class="muted">Sletter alle spillere og scorer, men beholder baneopsætningen.</p>
-          <button class="btn danger" id="btn-reset">Slet alle spillere og scorer</button>
+          <p class="muted">Sletter alle scorer og bekræftelser og lægger deltagerlisten ind igen. Baneopsætningen beholdes.</p>
+          <button class="btn danger" id="btn-reset">Nulstil scorer og deltagere</button>
         </details>
         <p class="muted" style="font-size:13px">Spillehandicap = HCP-index × slope ÷ 113 + (course rating − par), ganget med handicaptildelingen og rundet til hele slag. Med 100 % giver det samme tal som klubbens konverteringstabel. Slagene fordeles efter handicapnøglen. Spillere vælger selv tee ved tilmelding, når der er mere end ét.</p>
       </div>`;
@@ -901,11 +949,25 @@ Drikkevand foran hul 1 og 10. Toiletter ved hul 10 og 13. Hjertestarter ved klub
     }));
     el.querySelectorAll("[data-del]").forEach((b) => (b.onclick = () => {
       const p = state.players.find((x) => x.id === b.dataset.del);
-      if (!confirm(`Slet ${p.name} og alle spillerens scorer?`)) return;
+      if (!confirm(`Slet ${p.name} fra deltagerlisten sammen med alle spillerens scorer?`)) return;
       guarded(async () => { await api.deletePlayer(p.id); if (meId === p.id) { meId = null; ls.set("golf.me", null); } });
     }));
+    el.querySelectorAll("[data-hcp]").forEach((b) => (b.onclick = () => {
+      const p = state.players.find((x) => x.id === b.dataset.hcp);
+      const cur = S.hcpForRound(p, round);
+      const v = prompt(`HCP-index for ${p.name} ${dayLabel(courseOf(round)).toLowerCase()}:`, fmtHcp(cur != null ? cur : p.hcp));
+      if (v == null) return;
+      const hcp = parseNum(v);
+      if (isNaN(hcp)) return toast("Skriv et tal, fx 12,4");
+      guarded(async () => { await api.confirm(p.id, round, { hcp }); });
+    }));
+    el.querySelectorAll("[data-unconfirm]").forEach((b) => (b.onclick = () => {
+      const p = state.players.find((x) => x.id === b.dataset.unconfirm);
+      if (!confirm(`Træk ${p.name}s deltagelse ${dayLabel(courseOf(round)).toLowerCase()} tilbage? Eventuelle scorer på runden slettes.`)) return;
+      guarded(async () => { await api.unconfirm(p.id, round); });
+    }));
     $("#btn-reset").onclick = () => {
-      if (!confirm("Slet ALLE spillere og scorer? Det kan ikke fortrydes.")) return;
+      if (!confirm("Slet ALLE scorer og bekræftelser og læg deltagerlisten ind igen? Det kan ikke fortrydes.")) return;
       guarded(async () => { await api.reset(); meId = null; ls.set("golf.me", null); settingsDraft = null; });
     };
   }
@@ -920,7 +982,7 @@ Drikkevand foran hul 1 og 10. Toiletter ved hul 10 og 13. Hjertestarter ved klub
     $("#sheet").classList.remove("open"); $("#sheet-bg").classList.remove("open");
   }
   function renderSheet() {
-    const m = me(); if (!m || !sheetHole) return closeSheet();
+    const m = meForRound(); if (!m || !sheetHole) return closeSheet();
     const c = courseOf(round);
     const card = S.scorecard(m, c, scoresOf(round)[m.id], state.settings.allowance);
     const h = card.holes[sheetHole - 1];

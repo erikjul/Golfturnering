@@ -5,8 +5,13 @@ Alle, der har adressen, kan åbne den på telefonen, tilmelde sig og taste slag 
 
 ## Sådan virker den
 
-* **Tilmelding:** navn og DGU-handicap (HCP-index), og valg af tee hvis runden har flere. Appen
-  omregner til spillehandicap efter WHS: HCP-index × slope ÷ 113 + (course rating − par), ganget
+* **Deltagerliste og bekræftelse:** de 20 deltagere ligger klar i appen med navn, DGU-nr. og
+  seneste HCP-index. Spilleren vælger sit navn og bekræfter inden hver runde sit aktuelle
+  DGU-handicapindeks (og tee, hvis runden har flere). Først da deltager spilleren på runden og kan
+  taste scorer. Navne på listen, der ikke bekræfter til en runde, deltager ikke: de får 0
+  Stablefordpoint og 0 ranglistepoint for runden og tæller ikke med i deltagerantallet. Efter første
+  tastede score kan indekset kun ændres med PIN under Opsætning. Nye spillere kan tilføjes nederst.
+* **Spillehandicap** regnes efter WHS: HCP-index × slope ÷ 113 + (course rating − par), ganget
   med handicaptildelingen (100 % som standard, 95 % kan vælges) og rundet til hele slag. Med 100 %
   giver det præcis de samme tal som klubbens konverteringstabel (testet mod DGU's tabel for
   Samsø Golfklub, tee 56 og 49, herrer). Slagene fordeles efter banens handicapnøgle.
@@ -14,18 +19,20 @@ Alle, der har adressen, kan åbne den på telefonen, tilmelde sig og taste slag 
   med det samme, og tastaturet springer selv videre til næste hul. *Streg* = hullet opgivet (0 point).
 * **Stilling:** ranglisten for runden opdateres hvert par sekunder hos alle. Pile viser, hvem der er
   rykket op og ned siden sidst. Ved lige Stablefordpoint står den med laveste HCP-index øverst.
-* **Runden er færdig,** når alle tilmeldte (som ikke er sat til *spiller ikke*) har tastet 18 huller.
-  Så vises rundens vinder og turneringspointene: vinderen får *antal deltagere + 2*, nr. 2 får
-  *antal deltagere − 1*, og så videre ned til 1 point til sidstepladsen. Med 18 deltagere får
-  vinderen altså 20, nr. 2 får 17 og nr. 18 får 1.
-* **Samlet:** turneringspoint lagt sammen over de tre runder. Ved lighed tæller flest
-  Stablefordpoint i alt, derefter laveste HCP-index.
+* **Runden er færdig,** når alle bekræftede deltagere har tastet 18 huller (eller runden lukkes
+  manuelt under Opsætning). Så vises rundens vinder og ranglistepointene: vinderen får *antal
+  deltagere + 2*, nr. 2 får *antal deltagere − 1*, og så videre ned til 1 point til sidstepladsen.
+  Med 18 deltagere får vinderen altså 20, nr. 2 får 17, nr. 3 får 16 og nr. 18 får 1.
+* **Samlet:** ranglistepoint lagt sammen over de tre runder; 0 for runder, man ikke deltog i. Ved
+  lighed tæller flest Stablefordpoint i alt, derefter laveste HCP-index.
 * **Banen:** huloversigt med par, handicapnøgle og længder pr. tee samt klubbens lokalregler og
   ordensregler (teksten kan rettes under Opsætning).
 * **Opsætning (tandhjulet):** turneringens navn, bane, ét eller flere tees med course rating og
   slope, par og handicapnøgle pr. hul for hver runde (*Kopiér bane til alle runder* sparer tid),
-  *Luk runden nu* hvis nogen aldrig får tastet færdig, og sletning af spillere. Sæt en PIN i `.env`
-  (`GOLF_PIN`), så kun du kan gøre de ting – tilmelding og scoreindtastning kræver aldrig PIN.
+  *Luk runden nu* hvis nogen aldrig får tastet færdig, og deltagerlisten med mulighed for at rette
+  en spillers bekræftede indeks, trække en deltagelse tilbage eller slette en spiller. *Nulstil*
+  sletter alle scorer og bekræftelser og lægger deltagerlisten ind igen. Sæt en PIN i `.env`
+  (`GOLF_PIN`), så kun du kan gøre de ting – bekræftelse og scoreindtastning kræver aldrig PIN.
 
 Standardopsætningen er **Samsø Golfklub, 18 hullers bane** med par, handicapnøgle og længder pr. hul
 fra klubbens baneguide og lokalreglerne fra samme. To tees for herrer er sat op fra klubbens
