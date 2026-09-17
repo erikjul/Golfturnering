@@ -58,6 +58,15 @@ def test_forside_og_state(client):
     assert client.get("/api/state", params={"since": st["version"]}).json()["unchanged"] is True
 
 
+def test_manifest_og_ikoner_findes(client):
+    m = client.get("/static/manifest.webmanifest").json()
+    assert client.get(m["start_url"]).status_code == 200
+    for ikon in m["icons"]:
+        assert client.get(ikon["src"]).status_code == 200, ikon["src"]
+    assert client.get("/static/apple-touch-icon.png").status_code == 200
+    assert client.get("/static/logo.svg").status_code == 200
+
+
 def test_tilmeld_bekraeft_score_og_persistens(client, golf):
     r = client.post("/api/players", json={"name": "  Erik   Nielsen ", "hcp": 12.44, "dgu": "27-1"})
     assert r.status_code == 201
