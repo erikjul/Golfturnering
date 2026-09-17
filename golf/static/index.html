@@ -4,7 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<title>Golfturnering</title>
+<title>SlamChamp 2026</title>
+<meta name="theme-color" content="#0E3B2A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SlamChamp">
+<link rel="manifest" href="static/manifest.webmanifest">
+<link rel="apple-touch-icon" href="static/apple-touch-icon.png">
+<link rel="icon" type="image/svg+xml" href="static/logo.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="static/favicon-32.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600;700&display=swap">
 <style>
@@ -77,6 +86,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .top::after { content: ""; display: block; height: 3px; background: linear-gradient(90deg, var(--gold-bright), #F6DC8E 40%, var(--gold-bright)); }
 .top-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; max-width: 760px; margin: 0 auto; padding: 14px 16px 6px; }
 .top-row > div:first-child { min-width: 0; }
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand .logo { width: 52px; height: 52px; border-radius: 12px; flex: none; box-shadow: 0 3px 10px rgba(0,0,0,.35); }
 .top h1 { font-size: clamp(26px, 7.5vw, 40px); letter-spacing: .03em; text-transform: uppercase; text-shadow: 0 2px 0 rgba(0,0,0,.25); overflow-wrap: anywhere; }
 .top .sub { font-size: 12.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--board-muted); font-weight: 600; margin-top: 2px; }
 .icon-btn {
@@ -309,9 +320,12 @@ details summary { cursor: pointer; font-weight: 600; padding: 6px 0; }
 
 <header class="top">
   <div class="top-row">
-    <div>
+    <div class="brand">
+      <img class="logo" src="static/logo.svg" alt="" width="52" height="52">
+      <div>
       <h1 id="title">Golfturnering</h1>
       <div class="sub" id="subtitle">18.–20. september 2026 · Stableford</div>
+      </div>
     </div>
     <button class="icon-btn" id="btn-settings" aria-label="Opsætning" title="Opsætning">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
